@@ -1,0 +1,55 @@
+name: Release
+
+# Every push to main: derive the next semver from Conventional Commits since the last tag,
+# build the disk image, then tag and publish the GitHub release.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One release at a time – versions are derived from the latest tag.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Apple Silicon runner with Xcode 26 (needed to compile Resources/Icon.icon).
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history and tags for the version calculation
+
+      - name: Determine version
+        id: version
+        run: |
+          version="$(scripts/version.sh build/release-notes.md)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Next version: ${version:-none (no new commits)}"
+
+      - name: Set app version
+        if: steps.version.outputs.version != ''
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          plutil -replace CFBundleShortVersionString -string "$VERSION" Resources/Info.plist
+          plutil -replace CFBundleVersion -string "$GITHUB_RUN_NUMBER" Resources/Info.plist
+
+      - name: Build disk image
+        if: steps.version.outputs.version != ''
+        run: scripts/release.sh
+
+      - name: Tag and publish release
+        if: steps.version.outputs.version != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "v$VERSION" build/AudIO-*.dmg \
+            --target "$GITHUB_SHA" \
+            --title "AudIO $VERSION" \
+            --notes-file build/release-notes.md

@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleExecutable</key>
+    <string>AudIO</string>
+    <key>CFBundleIdentifier</key>
+    <string>dev.enke.AudIO.Driver</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>AudIO</string>
+    <key>CFBundlePackageType</key>
+    <string>BNDL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+    <key>CFBundleSupportedPlatforms</key>
+    <array>
+        <string>MacOSX</string>
+    </array>
+    <key>CFBundleVersion</key>
+    <string>3</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>14.2</string>
+    <key>CFPlugInFactories</key>
+    <dict>
+        <key>6B1F3C2E-8A4D-4E7B-9C51-3D2A7F0E9B64</key>
+        <string>AudIO_Create</string>
+    </dict>
+    <key>CFPlugInTypes</key>
+    <dict>
+        <!-- kAudioServerPlugInTypeUUID -->
+        <key>443ABAB8-E7B3-491A-B985-BEB9187030DB</key>
+        <array>
+            <string>6B1F3C2E-8A4D-4E7B-9C51-3D2A7F0E9B64</string>
+        </array>
+    </dict>
+</dict>
+</plist>
