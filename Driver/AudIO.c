@@ -34,6 +34,10 @@
 #define kVolumeMinDB        -64.0f
 #define kVolumeMaxDB        0.0f
 #define kDefaultVolume      0.75f
+// Custom property ('Alat', CFNumber of frames): the app writes the real latency of its
+// routing (outputs incl. Bluetooth, delay lines, buffers), reported as the device latency –
+// so video players delay the picture accordingly, like they do for AirPods directly.
+#define kAudIOPropertyLatency 'Alat'
 
 enum {
     kObjectID_PlugIn        = kAudioObjectPlugInObject,
@@ -68,6 +72,7 @@ static Boolean gOutputStreamActive = true;
 
 static _Atomic(float) gVolume = kDefaultVolume;   // scalar 0…1
 static _Atomic(UInt32) gMute = 0;
+static _Atomic(UInt32) gLatencyFrames = 0;
 
 // MARK: - Helpers
 
@@ -204,8 +209,27 @@ static OSStatus Device_GetProperty(const AudioObjectPropertyAddress* address,
         case kAudioDevicePropertyClockDomain: WRITE_VALUE(UInt32, 0);
         case kAudioDevicePropertyDeviceIsAlive: WRITE_VALUE(UInt32, 1);
         case kAudioDevicePropertyIsHidden: WRITE_VALUE(UInt32, 0);
-        case kAudioDevicePropertyLatency: WRITE_VALUE(UInt32, 0);
+        case kAudioDevicePropertyLatency: WRITE_VALUE(UInt32, input ? 0 : atomic_load(&gLatencyFrames));
         case kAudioDevicePropertySafetyOffset: WRITE_VALUE(UInt32, 0);
+
+        case kAudioObjectPropertyCustomPropertyInfoList: {
+            if (inDataSize < sizeof(AudioServerPlugInCustomPropertyInfo)) return kAudioHardwareBadPropertySizeError;
+            AudioServerPlugInCustomPropertyInfo* info = (AudioServerPlugInCustomPropertyInfo*)outData;
+            info->mSelector = kAudIOPropertyLatency;
+            info->mPropertyDataType = kAudioServerPlugInCustomPropertyDataTypeCFPropertyList;
+            info->mQualifierDataType = kAudioServerPlugInCustomPropertyDataTypeNone;
+            *outDataSize = sizeof(AudioServerPlugInCustomPropertyInfo);
+            return 0;
+        }
+
+        // Returned retained – the caller releases it.
+        case kAudIOPropertyLatency: {
+            if (inDataSize < sizeof(CFPropertyListRef)) return kAudioHardwareBadPropertySizeError;
+            UInt32 frames = atomic_load(&gLatencyFrames);
+            *(CFPropertyListRef*)outData = CFNumberCreate(NULL, kCFNumberSInt32Type, &frames);
+            *outDataSize = sizeof(CFPropertyListRef);
+            return 0;
+        }
         case kAudioDevicePropertyZeroTimeStampPeriod: WRITE_VALUE(UInt32, kRingFrames);
 
         case kAudioDevicePropertyDeviceIsRunning: {
@@ -409,8 +433,9 @@ static OSStatus QueryProperty(AudioObjectID object, const AudioObjectPropertyAdd
     UInt64 scratch[128] = { 0 };
     UInt32 size = 0;
     OSStatus status = GetProperty(object, address, qualifierSize, qualifier, sizeof(scratch), &size, scratch);
-    if (status == 0 && object == kObjectID_Device && address->mSelector == kAudioDevicePropertyIcon) {
-        CFRelease(*(CFURLRef*)scratch);
+    if (status == 0 && object == kObjectID_Device &&
+        (address->mSelector == kAudioDevicePropertyIcon || address->mSelector == kAudIOPropertyLatency)) {
+        CFRelease(*(CFTypeRef*)scratch);
     }
     if (outDataSize != NULL) *outDataSize = size;
     return status;
@@ -440,6 +465,25 @@ static OSStatus SetProperty(AudioObjectID object, const AudioObjectPropertyAddre
                 Float64 rate = *(const Float64*)inData;
                 if (!IsValidSampleRate(rate)) return kAudioHardwareIllegalOperationError;
                 RequestSampleRate(rate);
+                return 0;
+            }
+            if (address->mSelector == kAudIOPropertyLatency) {
+                if (inDataSize < sizeof(CFPropertyListRef)) return kAudioHardwareBadPropertySizeError;
+                CFPropertyListRef value = *(const CFPropertyListRef*)inData;
+                SInt32 frames = 0;
+                if (value == NULL || CFGetTypeID(value) != CFNumberGetTypeID() ||
+                    !CFNumberGetValue((CFNumberRef)value, kCFNumberSInt32Type, &frames)) {
+                    return kAudioHardwareIllegalOperationError;
+                }
+                UInt32 latency = frames > 0 ? (UInt32)frames : 0;
+                if (latency != atomic_exchange(&gLatencyFrames, latency) && gHost != NULL) {
+                    AudioObjectPropertyAddress changed[3] = {
+                        { kAudioDevicePropertyLatency, kAudioObjectPropertyScopeOutput, kAudioObjectPropertyElementMain },
+                        { kAudioDevicePropertyLatency, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain },
+                        { kAudIOPropertyLatency, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain },
+                    };
+                    gHost->PropertiesChanged(gHost, kObjectID_Device, 3, changed);
+                }
                 return 0;
             }
             break;
@@ -507,7 +551,7 @@ static OSStatus SetProperty(AudioObjectID object, const AudioObjectPropertyAddre
 static Boolean IsSettable(AudioObjectID object, AudioObjectPropertySelector selector) {
     switch (object) {
         case kObjectID_Device:
-            return selector == kAudioDevicePropertyNominalSampleRate;
+            return selector == kAudioDevicePropertyNominalSampleRate || selector == kAudIOPropertyLatency;
         case kObjectID_Stream_Output:
             return selector == kAudioStreamPropertyIsActive ||
                    selector == kAudioStreamPropertyVirtualFormat ||

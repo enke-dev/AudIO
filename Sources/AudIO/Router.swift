@@ -2,7 +2,10 @@ import AVFoundation
 import AppKit
 import AudioToolbox
 import CoreAudio
+import OSLog
 import SwiftUI
+
+private let latencyLog = Logger(subsystem: "dev.enke.AudIO", category: "latency")
 
 /// Main-thread state: device list, user settings, and reconciling both with the engine.
 @MainActor
@@ -129,11 +132,20 @@ final class Router: ObservableObject {
     }
 
     private func makeSystemListeners() -> [PropertyListener] {
-        [kAudioHardwarePropertyDevices, kAudioHardwarePropertyDefaultOutputDevice].compactMap { selector in
-            PropertyListener(object: .system, address: .init(selector)) { [weak self] in
+        // Device lists change in bursts (debounced); a switched system output is acted on at
+        // once – every millisecond there is a gap in the sound.
+        [
+            PropertyListener(object: .system, address: .init(kAudioHardwarePropertyDevices)) { [weak self] in
                 MainActor.assumeIsolated { self?.scheduleRefresh() }
-            }
-        }
+            },
+            PropertyListener(object: .system, address: .init(kAudioHardwarePropertyDefaultOutputDevice)) { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self, !self.isInstallingDriver else { return }
+                    self.refreshTask?.cancel()
+                    self.refresh()
+                }
+            },
+        ].compactMap { $0 }
     }
 
     /// Installs (or updates) the driver bundled with the app, then selects AudIO.
@@ -416,6 +428,26 @@ final class Router: ObservableObject {
             let gain = premixed.contains(route.uid) ? 1 : master * Volume.gain(for: settings.level)
             route.set(delayMs: settings.delayMs, gain: gain)
         }
+        reportLatency()
+    }
+
+    private var reportedLatency: Double?
+
+    /// Tells the driver how late routed audio is heard, so video players delay the picture
+    /// by that much (like for AirPods used directly): the slowest output's latency (incl.
+    /// Bluetooth, buffers) plus its delay line, and one more IO buffer for the capture.
+    /// Still short of the truth – the capture/drift compensation adds latency Core Audio
+    /// doesn't report (see scripts/lipsync.swift to measure).
+    private func reportLatency() {
+        guard let driver else { return }
+        let outputs = activeRoutes.compactMap { route in devices.first { $0.uid == route.uid } }
+        let slowest = outputs.map { Latency.output(of: $0.id) + (routes[$0.uid]?.delayMs ?? 0) / 1000 }.max()
+        let capture = outputs.first.map { Latency.buffer(of: $0.id) } ?? 0
+        let latency = slowest.map { $0 + capture } ?? 0
+        guard abs((reportedLatency ?? -1) - latency) > 0.001 else { return }
+        reportedLatency = latency
+        Latency.report(latency, to: driver.id)
+        latencyLog.notice("reported \(Int(latency * 1000), privacy: .public) ms")
     }
 
     // MARK: - Volume
