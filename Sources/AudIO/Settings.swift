@@ -3,18 +3,31 @@ import Foundation
 struct RouteSettings: Codable, Equatable {
     var isSelected = false
     var delayMs: Double = 0
-    /// Volume (0…1) for devices without a hardware volume control, applied in software.
-    /// Devices with hardware volume keep their level on the device itself.
-    var softwareVolume: Double = 1
+    /// The output's own level (0…1), before the master. Devices with hardware volume get
+    /// level × master on the device itself, the others in software.
+    var level: Double = 1
 
     init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case isSelected, delayMs, level
+        case softwareVolume // before 0.4: the level of devices without hardware volume
+    }
 
     // Tolerant decoding so older or partial stored settings don't reset everything.
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         isSelected = try container.decodeIfPresent(Bool.self, forKey: .isSelected) ?? false
         delayMs = try container.decodeIfPresent(Double.self, forKey: .delayMs) ?? 0
-        softwareVolume = try container.decodeIfPresent(Double.self, forKey: .softwareVolume) ?? 1
+        level = try container.decodeIfPresent(Double.self, forKey: .level)
+            ?? container.decodeIfPresent(Double.self, forKey: .softwareVolume) ?? 1
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(isSelected, forKey: .isSelected)
+        try container.encode(delayMs, forKey: .delayMs)
+        try container.encode(level, forKey: .level)
     }
 }
 

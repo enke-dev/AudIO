@@ -27,6 +27,14 @@ enum Volume {
         id.has(mute) && id.value(mute, default: UInt32(0)) != 0
     }
 
+    static func canMute(_ id: AudioDeviceID) -> Bool {
+        id.has(mute) && id.isSettable(mute)
+    }
+
+    static func setMuted(_ muted: Bool, on id: AudioDeviceID) {
+        try? id.write(mute, UInt32(muted ? 1 : 0))
+    }
+
     /// Perceptual curve for devices without hardware volume (~60 dB range, like a fader).
     static func gain(for scalar: Double) -> Float {
         Float(pow(scalar.clamped01, 3))

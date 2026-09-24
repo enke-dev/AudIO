@@ -19,8 +19,6 @@ final class Router: ObservableObject {
     @Published private(set) var devices: [OutputDevice] = []
     @Published private(set) var defaultOutputUID: String?
     @Published private(set) var status: Status = .disabled
-    /// Current volume (0…1) per device UID, hardware or software.
-    @Published private(set) var volumes: [String: Double] = [:]
     /// The AudIO driver device, when installed. AudIO routes exactly while it is the
     /// system output; its volume is the master (published by the driver, applied here).
     @Published private(set) var driver: SubDevice?
@@ -218,7 +216,7 @@ final class Router: ObservableObject {
     func volumeBinding(for uid: String) -> Binding<Double> {
         Binding(
             get: { [weak self] in
-                MainActor.assumeIsolated { self?.volumes[uid] ?? 1 }
+                MainActor.assumeIsolated { self?.routes[uid]?.level ?? 1 }
             },
             set: { [weak self] value in
                 MainActor.assumeIsolated { self?.setVolume(value, for: uid) }
@@ -236,6 +234,7 @@ final class Router: ObservableObject {
                     guard let self, let driver = self.driver else { return }
                     self.driverVolume = value.clamped01
                     self.applyParameters() // don't wait for the listener round trip
+                    self.pushHardwareVolumes()
                     Volume.write(value, to: driver.id)
                 }
             }
@@ -243,14 +242,7 @@ final class Router: ObservableObject {
     }
 
     func setVolume(_ value: Double, for uid: String) {
-        guard let device = devices.first(where: { $0.uid == uid }) else { return }
-        let value = value.clamped01
-        volumes[uid] = value
-        if device.hasVolumeControl {
-            Volume.write(value, to: device.id) // the property listener reports back
-        } else {
-            routes[uid, default: RouteSettings()].softwareVolume = value
-        }
+        routes[uid, default: RouteSettings()].level = value.clamped01 // → reconcile → hardware
     }
 
     var canMeasure: Bool { selectedDevices.count >= 2 && isEngineRunning && !isCalibrating }
@@ -309,7 +301,6 @@ final class Router: ObservableObject {
         driverState = DriverInstaller.state
         defaultOutputID = Devices.defaultOutput()
         defaultOutputUID = devices.first { $0.id == defaultOutputID }?.uid
-        syncVolumes()
         syncDriverVolume()
         observeVolumes()
         reconcile()
@@ -323,6 +314,7 @@ final class Router: ObservableObject {
 
     private func reconcile() {
         guard !isCalibrating else { return } // the calibrator owns the devices meanwhile
+        updatePremix()
         let selected = selectedDevices
 
         // Requires the driver: on while AudIO (a silent sink) is the system output; the tap
@@ -415,41 +407,112 @@ final class Router: ObservableObject {
     }
 
     /// Master (AudIO's volume/mute, from the driver) × each output's level, applied after
-    /// the delay line so changes are heard right away.
+    /// the delay line so changes are heard right away – in software only for outputs without
+    /// hardware volume; the others carry it on the device (see `updatePremix`).
     private func applyParameters() {
         let master: Float = isDriverMuted ? 0 : Volume.gain(for: driverVolume)
         activeRoutes.forEach { route in
             let settings = routes[route.uid] ?? RouteSettings()
-            let device = devices.first { $0.uid == route.uid }
-            let level: Float = device?.hasVolumeControl == true
-                ? 1 // level is set on the device itself
-                : Volume.gain(for: settings.softwareVolume)
-            route.set(delayMs: settings.delayMs, gain: master * level)
+            let gain = premixed.contains(route.uid) ? 1 : master * Volume.gain(for: settings.level)
+            route.set(delayMs: settings.delayMs, gain: gain)
         }
     }
 
     // MARK: - Volume
     //
-    // Every output keeps its own level – its hardware volume where available (synced both
-    // ways), a software fader otherwise. AudIO's own volume is the master.
+    // Every output has its own level; AudIO's own volume is the master. Outputs with a
+    // hardware volume get level × master on the device itself ("premixed"), so whenever
+    // AudIO stops routing – quit, another output picked in the Sound menu, even a crash –
+    // the device already plays exactly as loud as it did through AudIO. (With the cubic
+    // volume taper, multiplying the 0…1 values adds their decibels.)
 
-    private func currentVolume(of device: OutputDevice) -> Double {
-        device.hasVolumeControl
-            ? Volume.read(device.id) ?? 1
-            : routes[device.uid]?.softwareVolume ?? 1
+    /// Hardware-volume outputs currently carrying the master.
+    private var premixed: Set<String> = []
+    /// Hardware volumes AudIO last wrote – any other reported value was changed on the
+    /// device itself (its buttons, another app).
+    private var writtenVolumes: [String: Double] = [:]
+    private var lastWrites: [String: Date] = [:]
+    private var isUpdatingPremix = false
+
+    private var effectiveMaster: Double { isDriverMuted ? 0 : driverVolume }
+
+    /// Premixes every routed hardware-volume output. One joining adopts its level from its
+    /// current volume, so switching to AudIO doesn't change the loudness either.
+    private func updatePremix() {
+        guard !isUpdatingPremix else { return }
+        isUpdatingPremix = true
+        defer { isUpdatingPremix = false }
+
+        let targets = isDriverActive
+            ? Set(selectedDevices.filter(\.hasVolumeControl).map(\.uid))
+            : []
+        for uid in targets.subtracting(premixed) { adoptLevel(of: uid) }
+        // Deselected while routing: back to its own level. When AudIO stops routing the
+        // premixed volumes stay – that's the hand-over.
+        if isDriverActive {
+            for uid in premixed.subtracting(targets) {
+                guard let device = devices.first(where: { $0.uid == uid }) else { continue }
+                write(routes[uid]?.level ?? 1, to: device)
+                if Volume.canMute(device.id) { Volume.setMuted(false, on: device.id) }
+            }
+        }
+        premixed = targets
+        pushHardwareVolumes()
+        // Adopting a level above re-entered reconcile while `premixed` was still the old set –
+        // a running engine got the master in software on top of the hardware. Re-apply.
+        applyParameters()
     }
 
-    private func syncVolumes() {
-        volumes = devices.reduce(into: [:]) { $0[$1.uid] = currentVolume(of: $1) }
+    private func adoptLevel(of uid: String) {
+        guard let device = devices.first(where: { $0.uid == uid }),
+              let volume = Volume.read(device.id), effectiveMaster > 0.01 else { return }
+        routes[uid, default: RouteSettings()].level = min(volume / effectiveMaster, 1)
+    }
+
+    /// Level × master onto every premixed output (mute as mute where the device has one).
+    private func pushHardwareVolumes() {
+        for uid in premixed {
+            guard let device = devices.first(where: { $0.uid == uid }) else { continue }
+            let canMute = Volume.canMute(device.id)
+            let volume = isDriverMuted && !canMute ? 0 : (routes[uid]?.level ?? 1) * driverVolume
+            write(volume, to: device)
+            if canMute, Volume.isMuted(device.id) != isDriverMuted {
+                Volume.setMuted(isDriverMuted, on: device.id)
+            }
+        }
+    }
+
+    private func write(_ volume: Double, to device: OutputDevice) {
+        let volume = volume.clamped01
+        guard abs((writtenVolumes[device.uid] ?? -1) - volume) > 0.001 else { return }
+        writtenVolumes[device.uid] = volume
+        lastWrites[device.uid] = Date()
+        Volume.write(volume, to: device.id)
+    }
+
+    /// A premixed output's volume changed on the device itself: that becomes its level –
+    /// or, beyond the master, the master (with a single output its buttons act as the master).
+    private func hardwareVolumeChanged(_ device: OutputDevice) {
+        // Our own writes echo back – Bluetooth devices round them to their few volume steps,
+        // so compare loosely and ignore reports right after a write.
+        guard premixed.contains(device.uid), let volume = Volume.read(device.id),
+              abs((writtenVolumes[device.uid] ?? -1) - volume) > 0.02,
+              Date().timeIntervalSince(lastWrites[device.uid] ?? .distantPast) > 0.75 else { return }
+        writtenVolumes[device.uid] = volume
+        guard !isDriverMuted else { return }
+        if volume <= driverVolume, driverVolume > 0.01 {
+            routes[device.uid, default: RouteSettings()].level = volume / driverVolume
+        } else if let driver {
+            routes[device.uid, default: RouteSettings()].level = 1
+            driverVolume = volume
+            Volume.write(volume, to: driver.id) // other outputs follow via the listener
+        }
     }
 
     private func observeVolumes() {
         let deviceListeners = devices.filter(\.hasVolumeControl).compactMap { device in
             PropertyListener(object: device.id, address: Volume.main) { [weak self] in
-                MainActor.assumeIsolated {
-                    guard let self, let value = Volume.read(device.id) else { return }
-                    self.volumes[device.uid] = value
-                }
+                MainActor.assumeIsolated { self?.hardwareVolumeChanged(device) }
             }
         }
         let driverListeners = driver.map { driver in
@@ -467,6 +530,7 @@ final class Router: ObservableObject {
         driverVolume = Volume.read(driver.id) ?? 1
         isDriverMuted = Volume.isMuted(driver.id)
         applyParameters()
+        pushHardwareVolumes()
     }
 }
 
