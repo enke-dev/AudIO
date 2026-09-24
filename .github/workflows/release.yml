@@ -41,6 +41,31 @@ jobs:
           plutil -replace CFBundleShortVersionString -string "$VERSION" Resources/Info.plist
           plutil -replace CFBundleVersion -string "$GITHUB_RUN_NUMBER" Resources/Info.plist
 
+      # Self-signed certificate from scripts/signing.sh: a stable signature keeps users'
+      # audio capture and microphone permissions across updates. Ad-hoc without it.
+      - name: Import signing certificate
+        if: steps.version.outputs.version != ''
+        env:
+          P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          P12_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          if [ -z "$P12" ]; then echo "::warning::No signing certificate secret – building ad-hoc"; exit 0; fi
+          p12="$RUNNER_TEMP/certificate.p12"
+          keychain="$RUNNER_TEMP/signing.keychain-db"
+          keychain_password="$(/usr/bin/openssl rand -base64 24)"
+          echo "$P12" | base64 --decode > "$p12"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$p12" -k "$keychain" -P "$P12_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$keychain_password" "$keychain" >/dev/null
+          security list-keychains -d user -s "$keychain" $(security list-keychains -d user | tr -d '"')
+          # Sign by SHA-1 hash: unambiguous, and independent of the certificate's trust.
+          hash="$(/usr/bin/openssl pkcs12 -in "$p12" -nokeys -passin env:P12_PASSWORD \
+            | /usr/bin/openssl x509 -noout -fingerprint -sha1 | cut -d= -f2 | tr -d :)"
+          rm "$p12"
+          echo "CODESIGN_IDENTITY=$hash" >> "$GITHUB_ENV"
+
       - name: Build disk image
         if: steps.version.outputs.version != ''
         run: scripts/release.sh

@@ -2,14 +2,19 @@
 # Builds AudIO.app from the Swift package.
 #   scripts/app.sh [build|run|install|icon]
 # Env: CONFIGURATION (release|debug, default release)
-#      CODESIGN_IDENTITY (default "-" = ad-hoc; use a stable identity so the
-#      audio capture permission survives rebuilds)
+#      CODESIGN_IDENTITY (default: "AudIO Code Signing" from the keychain if present –
+#      see scripts/signing.sh – else "-" = ad-hoc. A stable identity keeps the audio
+#      capture and microphone permissions across rebuilds.)
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
 command="${1:-build}"
 configuration="${CONFIGURATION:-release}"
-identity="${CODESIGN_IDENTITY:--}"
+identity="${CODESIGN_IDENTITY:-}"
+if [ -z "$identity" ]; then
+    identity="-"
+    if security find-certificate -c "AudIO Code Signing" >/dev/null 2>&1; then identity="AudIO Code Signing"; fi
+fi
 app="build/AudIO.app"
 
 # Compiles the Icon Composer file into Assets.car (+ Icon.icns for macOS < 26).
