@@ -17,8 +17,10 @@ permissions:
 
 jobs:
   release:
-    # Apple Silicon runner with Xcode 26 (needed to compile Resources/Icon.icon).
-    runs-on: macos-26
+    # Apple Silicon runner on macOS 27 with Xcode 27: Icon.icon needs Xcode 26+, the status
+    # item's system-managed panel session (menu bar stays revealed, icon highlighted) the
+    # macOS 27 SDK. Public preview – switch to `macos-27` once that label is available.
+    runs-on: xcode-27
     steps:
       - uses: actions/checkout@v4
         with:
