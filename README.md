@@ -1,4 +1,4 @@
-<p align="center"><img src="Resources/Icon.png" width="128" alt="AudIO icon"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/icon.png" width="128" alt="AudIO icon"></p>
 
 # AudIO
 
@@ -8,20 +8,22 @@ AudIO adds an **AudIO** device to the Sound menu. Select it to start routing, pi
 
 Requires macOS 14.2 or later on Apple Silicon.
 
+<p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/screenshot.png" width="335" alt="The AudIO panel in the menu bar: master volume, outputs with level and delay, Measure Delays"></p>
+
 ## Install
 
-1. Download the latest `.dmg` from [Releases](../../releases) and drag AudIO to Applications.
+1. Download the latest `.dmg` from [Releases](https://github.com/enke-dev/AudIO/releases) and drag AudIO to Applications.
 2. The app isn't notarized, so macOS blocks it on first launch. Open **System Settings › Privacy & Security** and click **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/AudIO.app`.
-3. Click **Install audio device** in the menu bar popover (asks for your password), then allow system audio recording when prompted.
+3. Click **Install Audio Device** in the menu bar panel (asks for your password), then allow system audio recording when prompted.
 
 ## Use
 
-- Tick the outputs to play on. Each gets a **Level** and a **Delay** slider.
-- **Measure delays** plays short test tones through each output and uses the microphone to align them. Keep the room quiet and the Mac near your listening position.
+- Click the outputs to play on. Each selected output gets a **Level** and a **Delay** slider.
+- **Measure Delays** plays short test tones through each output and uses the microphone to align them. Keep the room quiet and the Mac near your listening position.
 
 ## Build
 
-Requires Xcode 26.
+Requires Xcode 26 or later; build with Xcode 27 for the macOS 27 menu bar behavior (icon highlight, auto-hidden menu bar stays revealed).
 
 ```sh
 scripts/app.sh run         # build and launch build/AudIO.app (driver bundled)
