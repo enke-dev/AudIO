@@ -8,7 +8,7 @@ AudIO adds an **AudIO** device to the Sound menu. Select it to start routing, pi
 
 Requires macOS 14.2 or later on Apple Silicon. Available in English, German, French, Italian, Spanish, Portuguese (Brazil), Dutch, Danish, Swedish, Norwegian, Finnish, Polish, Czech, Ukrainian, Japanese, Chinese (Simplified) and Korean.
 
-<p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/screenshot.png" width="335" alt="The AudIO panel in the menu bar: master volume, outputs with level and delay, Measure Delays"></p>
+<p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/screenshot.png" width="381" alt="The AudIO panel in the menu bar: master volume, outputs with level and delay, Measure Delays"></p>
 
 ## Install
 

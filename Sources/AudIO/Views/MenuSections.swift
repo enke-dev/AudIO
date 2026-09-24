@@ -20,6 +20,11 @@ enum MenuMetrics {
     static let iconSpacing: CGFloat = 8
     /// Where labels start (and where level/delay line up).
     static let textInset = inset + iconSize + iconSpacing
+    /// Symbol column left of a slider (master, level, delay) – fixed, so all sliders start
+    /// at the same x, whatever the symbol.
+    static let sliderIconWidth: CGFloat = 20
+    /// Symbol → slider.
+    static let sliderSpacing: CGFloat = 8
     /// Level/delay opening – the panel grows along in the same SwiftUI animation.
     static let animation = Animation.easeInOut(duration: 0.25)
 }
@@ -226,8 +231,9 @@ struct MasterVolumeView: View {
     @EnvironmentObject private var router: Router
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: MenuMetrics.sliderSpacing) {
             Image(systemName: router.isDriverMuted ? "speaker.slash.fill" : "speaker.fill")
+                .frame(width: MenuMetrics.sliderIconWidth)
             MenuSlider(value: router.driverVolumeBinding())
             Image(systemName: "speaker.wave.3.fill")
         }
