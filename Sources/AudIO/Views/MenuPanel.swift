@@ -24,6 +24,9 @@ final class MenuPanel: NSPanel {
     private var observers: [NSObjectProtocol] = []
     private var visibilityObserver: NSObjectProtocol?
     private var shownAt = Date.distantPast
+    /// Counts openings – a pending close fallback must only ever hide the opening it was
+    /// meant for.
+    private var openings = 0
     private weak var anchor: NSStatusBarButton?
     /// When the panel last closed – a click on the status item that closed it (by taking
     /// focus) must not immediately reopen it.
@@ -94,6 +97,7 @@ final class MenuPanel: NSPanel {
         // app (redrawing the status bar would drop the highlight before macOS 27).
         makeKeyAndOrderFront(nil)
         shownAt = Date()
+        openings += 1
         panelLog.notice("show (active: \(NSApp.isActive, privacy: .public), space: \(self.isOnActiveSpace, privacy: .public))")
         if managesHighlight {
             button.highlight(true)
@@ -150,10 +154,13 @@ final class MenuPanel: NSPanel {
     func dismiss() {
         guard isVisible else { return }
         if requestClose?() == true {
-            // Fallback if the system never reports the session's end.
+            // Fallback if the system never reports the session's end – for this opening only:
+            // reopened within the delay, it would otherwise hide the new panel while its
+            // session keeps running (the icon then seems dead until that session ends).
+            let opening = openings
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
                 MainActor.assumeIsolated {
-                    guard let self, self.isVisible else { return }
+                    guard let self, self.isVisible, self.openings == opening else { return }
                     panelLog.error("session end not reported – hiding")
                     self.hide()
                 }
