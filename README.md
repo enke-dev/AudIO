@@ -20,6 +20,7 @@ Requires macOS 14.2 or later on Apple Silicon.
 
 - Click the outputs to play on. Each selected output gets a **Level** and a **Delay** slider.
 - **Measure Delays** plays short test tones through each output and uses the microphone to align them. Keep the room quiet and the Mac near your listening position.
+- **Check for Updates** looks for a new release on GitHub at launch and once a day. **Update to …** next to the title installs it and restarts AudIO.
 
 ## Build
 
@@ -31,7 +32,7 @@ scripts/driver.sh install  # install the driver directly (restarts coreaudiod)
 scripts/release.sh         # build/AudIO-<version>.dmg
 ```
 
-Every push to `main` is released: GitHub Actions derives the next semver from [Conventional Commits](https://www.conventionalcommits.org) since the last tag (`feat` → minor, `!`/`BREAKING CHANGE` → major, anything else → patch; see `scripts/version.sh`), builds the `.dmg`, tags it and publishes the release. The version in `Resources/Info.plist` stays `0.0.0` in the repo. Builds are ad-hoc signed; set `CODESIGN_IDENTITY` to a self-signed code-signing certificate so macOS keeps your permissions across rebuilds. After changing the driver, bump `CFBundleVersion` in `Driver/Info.plist` so the app offers the update.
+Every push to `main` is released: GitHub Actions derives the next semver from [Conventional Commits](https://www.conventionalcommits.org) since the last tag (`feat` → minor, `!`/`BREAKING CHANGE` → major, anything else → patch; see `scripts/version.sh`), builds the `.dmg`, tags it and publishes the release. The version in `Resources/Info.plist` stays `0.0.0` in the repo. Builds are signed with a self-signed certificate so macOS keeps the audio permissions across updates: `scripts/signing.sh setup` creates it once, stores it in 1Password, sets the GitHub secrets and imports it into your keychain (`scripts/signing.sh import` on another Mac). Without it, builds are ad-hoc signed. After changing the driver, bump `CFBundleVersion` in `Driver/Info.plist` so the app offers the update.
 
 ## Uninstall
 

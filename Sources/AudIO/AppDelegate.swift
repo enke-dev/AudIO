@@ -6,6 +6,7 @@ import SwiftUI
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var router: Router?
+    private let updater = Updater()
     private var statusItem: NSStatusItem?
     private var panel: MenuPanel?
     private var statusSubscription: AnyCancellable?
@@ -33,8 +34,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let router = Router()
         self.router = router
-        let panel = MenuPanel(rootView: MenuView(close: { [weak self] in self?.panel?.dismiss() }).environmentObject(router))
+        let panel = MenuPanel(rootView: MenuView(close: { [weak self] in self?.panel?.dismiss() })
+            .environmentObject(router)
+            .environmentObject(updater))
         self.panel = panel
+        updater.start()
 
         #if compiler(>=6.4) // macOS 27 SDK
         if #available(macOS 27.0, *) {
@@ -122,7 +126,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 #if compiler(>=6.4) // macOS 27 SDK
 @available(macOS 27.0, *)
-extension AppDelegate: NSStatusItemExpandedInterfaceDelegate {
+extension AppDelegate: @MainActor NSStatusItemExpandedInterfaceDelegate {
     func statusItem(_ statusItem: NSStatusItem, didBegin expandedInterfaceSession: NSStatusItemExpandedInterfaceSession) {
         panelLog.notice("session began")
         // A click on the icon while open may first close the panel by taking its focus –

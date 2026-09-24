@@ -63,8 +63,18 @@ build() {
     echo "Built $app (signed with: $identity)"
 }
 
-relaunch() {
+# Quits AudIO properly (it restores the sound output) and waits until it's gone – opening
+# the app while the old process is still exiting fails with LaunchServices error -600.
+quit() {
+    pgrep -x AudIO >/dev/null || return 0 # (AppleScript would launch it just to quit it)
+    osascript -e 'quit app id "dev.enke.AudIO"' 2>/dev/null || true
+    for _ in $(seq 50); do pgrep -x AudIO >/dev/null || return 0; sleep 0.1; done
     pkill -x AudIO 2>/dev/null || true
+    sleep 0.5
+}
+
+relaunch() {
+    quit
     open "$1"
 }
 
@@ -74,7 +84,7 @@ case "$command" in
     run) build && relaunch "$app" ;;
     install)
         build
-        pkill -x AudIO 2>/dev/null || true
+        quit
         rm -rf /Applications/AudIO.app
         cp -R "$app" /Applications/
         relaunch /Applications/AudIO.app

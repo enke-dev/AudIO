@@ -145,9 +145,11 @@ struct MenuActionRow: View {
     }
 }
 
-/// "AudIO" title, plus a button only for what's missing (install/update, select AudIO).
+/// "AudIO" title, plus a button only for what's missing (install/update the driver, select
+/// AudIO) or an app update.
 struct MenuTitleView: View {
     @EnvironmentObject private var router: Router
+    @EnvironmentObject private var updater: Updater
 
     var body: some View {
         HStack {
@@ -157,10 +159,11 @@ struct MenuTitleView: View {
             }
             Spacer()
             // Selecting "AudIO" as sound output is the switch; buttons only for what's missing.
-            if router.isInstallingDriver {
+            if router.isInstallingDriver || updater.state == .updating {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text("Installing…").font(.caption).foregroundStyle(.secondary)
+                    Text(router.isInstallingDriver ? "Installing…" : "Updating…")
+                        .font(.caption).foregroundStyle(.secondary)
                 }
             } else if let title = driverButtonTitle {
                 Button(title) { router.installDriver() }
@@ -171,6 +174,14 @@ struct MenuTitleView: View {
                 Button("Use AudIO") { router.activate() }
                     .controlSize(.small)
                     .help("Selects “AudIO” as sound output – same as picking it in the Sound menu")
+            } else if case .available(let version) = updater.state {
+                Button("Update to \(version)") { updater.install() }
+                    .controlSize(.small)
+                    .help("Downloads AudIO \(version) from GitHub, replaces this version and restarts")
+            } else if case .failed(let message) = updater.state {
+                Button("Update Failed") { updater.retry() }
+                    .controlSize(.small)
+                    .help("\(message) Click to try again.")
             }
         }
         .frame(height: 22)
@@ -226,9 +237,10 @@ struct MasterVolumeView: View {
     }
 }
 
-/// "Measure Delays" and "Open at Login".
+/// "Measure Delays", "Check for Updates" and "Open at Login".
 struct MenuActionsView: View {
     @EnvironmentObject private var router: Router
+    @EnvironmentObject private var updater: Updater
     /// Closes the panel before an action that takes over (the measurement).
     var close: () -> Void = {}
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
@@ -240,6 +252,10 @@ struct MenuActionsView: View {
                 router.measureDelays()
             }
             .help("Plays a short test tone on each selected output and measures when it arrives")
+            MenuActionRow(title: "Check for Updates", isChecked: updater.isEnabled) {
+                updater.isEnabled.toggle()
+            }
+            .help("Looks for a new release on GitHub at launch and once a day")
             MenuActionRow(title: "Open at Login", isChecked: launchAtLogin, isEnabled: router.isReady && LaunchAtLogin.isAvailable) {
                 LaunchAtLogin.set(!launchAtLogin)
                 launchAtLogin = LaunchAtLogin.isEnabled
