@@ -29,7 +29,6 @@ enum Sweep {
 final class Probe: @unchecked Sendable {
     private static let capacity = 64
 
-    let sampleRate: Double
     private let sweep: [Float]
     private let routeRanges: [Range<Int>]
 
@@ -48,7 +47,6 @@ final class Probe: @unchecked Sendable {
     private var playOffset = 0
 
     init(sampleRate: Double, routeRanges: [Range<Int>]) {
-        self.sampleRate = sampleRate
         self.routeRanges = routeRanges
         sweep = Sweep.samples(sampleRate: sampleRate)
         shared = .allocate(capacity: 2)

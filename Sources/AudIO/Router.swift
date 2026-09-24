@@ -58,6 +58,29 @@ final class Router: ObservableObject {
         driver.map { $0.id == defaultOutputID } ?? false
     }
 
+    /// A line under the title – only for what needs attention: errors, a running measurement.
+    struct Notice: Equatable {
+        let text: String
+        let isError: Bool
+    }
+
+    var notice: Notice? {
+        if let driverError { return Notice(text: driverError, isError: true) }
+        return switch (calibration, status) {
+        case (.measuring(let text), _): Notice(text: text, isError: false)
+        case (.failed(let text), _): Notice(text: text, isError: true)
+        case (_, .failed(let text)): Notice(text: text, isError: true)
+        case (_, .starting) where isSlowStart:
+            Notice(text: "Starting… if macOS asks, allow system audio recording", isError: false)
+        default: nil
+        }
+    }
+
+    /// Controls are live: driver installed, AudIO is the sound output, no install running.
+    var isReady: Bool {
+        driver != nil && isDriverActive && !isInstallingDriver
+    }
+
     /// Selects AudIO as system output (the header button when it isn't).
     func activate() {
         failedKey = nil // a manual activation deserves a fresh start attempt
@@ -75,6 +98,10 @@ final class Router: ObservableObject {
     /// aggregate itself fires "devices changed", which would otherwise loop forever.
     private var failedKey: [String]?
     private var generation = 0
+    /// A start that takes a while (usually waiting for the recording permission) – only
+    /// then the "Starting…" notice appears; quick restarts would just make the menu jump.
+    @Published private var isSlowStart = false
+    private var slowStartTask: Task<Void, Never>?
     /// Routes and probe of the running engine, handed over from the engine queue – the
     /// engine itself is only touched on that queue.
     private var activeRoutes: [Route] = []
@@ -160,7 +187,7 @@ final class Router: ObservableObject {
     }
 
     /// Switching the system output can take a moment while Core Audio (re)starts devices –
-    /// done off the main thread so the popover stays responsive. The listener reports back.
+    /// done off the main thread so the panel stays responsive. The listener reports back.
     private func selectAudIO(_ on: Bool) {
         guard on != isDriverActive, let target = outputTarget(audIO: on) else { return }
         if on { store.previousOutputUID = defaultOutputUID }
@@ -321,6 +348,13 @@ final class Router: ObservableObject {
         generation += 1
         let request = generation
         pendingKey = key
+        isSlowStart = false
+        slowStartTask?.cancel()
+        slowStartTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled, let self, self.generation == request else { return }
+            withAnimation(MenuMetrics.animation) { self.isSlowStart = true }
+        }
         isEngineRunning = false
         activeRoutes = []
         activeProbe = nil
@@ -339,7 +373,18 @@ final class Router: ObservableObject {
 
     private func engineStarted(request: Int, key: [String], count: Int, result: Result<EngineHandle, Error>) {
         guard request == generation else { return } // superseded by a newer start or a halt
+        // Arrives while the menu may still be animating (an output was just ticked). Applying
+        // the resulting UI changes (e.g. "Measure Delays" enabling) without that animation
+        // would snap the affected rows to their end positions mid-flight.
+        withAnimation(MenuMetrics.animation) {
+            finishStart(key: key, count: count, result: result)
+        }
+    }
+
+    private func finishStart(key: [String], count: Int, result: Result<EngineHandle, Error>) {
         pendingKey = nil
+        slowStartTask?.cancel()
+        isSlowStart = false
         switch result {
         case .success(let handle):
             failedKey = nil
@@ -359,6 +404,8 @@ final class Router: ObservableObject {
     private func halt(_ status: Status) {
         generation += 1
         pendingKey = nil
+        slowStartTask?.cancel()
+        isSlowStart = false
         runningKey = nil
         activeRoutes = []
         activeProbe = nil

@@ -9,7 +9,6 @@ struct SubDevice: Hashable {
 /// Buffer indices of each sub-device's streams in the aggregate's IOProc buffer lists.
 struct StreamLayout {
     var outputs: [String: Range<Int>] = [:]
-    var inputs: [String: Range<Int>] = [:]
     var outputCount = 0
     var inputCount = 0
 }
@@ -75,7 +74,6 @@ enum Aggregate {
             let outputs = device.id.streamCount(kAudioObjectPropertyScopeOutput)
             let inputs = device.id.streamCount(kAudioObjectPropertyScopeInput)
             layout.outputs[uid] = layout.outputCount..<(layout.outputCount + outputs)
-            layout.inputs[uid] = layout.inputCount..<(layout.inputCount + inputs)
             layout.outputCount += outputs
             layout.inputCount += inputs
         }

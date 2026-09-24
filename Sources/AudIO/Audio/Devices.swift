@@ -12,16 +12,13 @@ struct OutputDevice: Identifiable, Hashable {
     let hasVolumeControl: Bool
 
     var symbolName: String {
+        // Like the Sound menu: specific symbols where it has them, a speaker otherwise.
         switch transportType {
         case UInt32(kAudioDeviceTransportTypeBuiltIn): "laptopcomputer"
-        case UInt32(kAudioDeviceTransportTypeBluetooth),
-             UInt32(kAudioDeviceTransportTypeBluetoothLE): "hifispeaker"
-        case UInt32(kAudioDeviceTransportTypeAirPlay): "airplayaudio"
         case UInt32(kAudioDeviceTransportTypeHDMI),
              UInt32(kAudioDeviceTransportTypeDisplayPort): "display"
-        case UInt32(kAudioDeviceTransportTypeUSB): "cable.connector"
-        case UInt32(kAudioDeviceTransportTypeVirtual): "waveform"
-        default: "speaker.wave.2"
+        case UInt32(kAudioDeviceTransportTypeAirPlay): "airplayaudio"
+        default: "speaker.wave.2.fill"
         }
     }
 }
