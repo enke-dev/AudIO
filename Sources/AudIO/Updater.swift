@@ -145,9 +145,18 @@ final class Updater: ObservableObject {
         else { throw UpdateError(String(localized: "The downloaded app isn’t signed like this one – not installed.")) }
     }
 
-    /// Opens the (new) app once this process has exited, then quits.
+    /// Opens the (new) app once this process has exited, then quits. LaunchServices can
+    /// still list the exited process for a moment and then refuses to open the app (-600,
+    /// seen after back-to-back updates) – so retry for a few seconds, and log a failure.
     private static func relaunch(_ app: URL) {
-        let script = "while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done; open \"$0\""
+        let script = """
+            while kill -0 \(ProcessInfo.processInfo.processIdentifier) 2>/dev/null; do sleep 0.2; done
+            for _ in 1 2 3 4 5 6 7 8 9 10; do
+                open "$0" 2>/dev/null && exit 0
+                sleep 0.5
+            done
+            logger -t AudIO "relaunch after update failed: $0"
+            """
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/sh")
         process.arguments = ["-c", script, app.path]
