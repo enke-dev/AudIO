@@ -6,7 +6,7 @@ Play your Mac's audio on several outputs at once (e.g. MacBook speakers + a Blue
 
 AudIO adds an **AudIO** device to the Sound menu. Select it to start routing, pick another device to stop. The volume keys control the master.
 
-Requires macOS 14.2 or later on Apple Silicon.
+Requires macOS 14.2 or later on Apple Silicon. Available in English, German, French, Italian, Spanish, Portuguese (Brazil), Dutch, Danish, Swedish, Norwegian, Finnish, Polish, Czech, Ukrainian, Japanese, Chinese (Simplified) and Korean.
 
 <p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/screenshot.png" width="335" alt="The AudIO panel in the menu bar: master volume, outputs with level and delay, Measure Delays"></p>
 
@@ -31,6 +31,8 @@ scripts/app.sh run         # build and launch build/AudIO.app (driver bundled)
 scripts/driver.sh install  # install the driver directly (restarts coreaudiod)
 scripts/release.sh         # build/AudIO-<version>.dmg
 ```
+
+Translations live in `Resources/Localizable.xcstrings` and `Resources/InfoPlist.xcstrings` (String Catalogs, editable in Xcode). To try a language: `open build/AudIO.app --args -AppleLanguages '(de)'`.
 
 Every push to `main` is released: GitHub Actions derives the next semver from [Conventional Commits](https://www.conventionalcommits.org) since the last tag (`feat` → minor, `!`/`BREAKING CHANGE` → major, anything else → patch; see `scripts/version.sh`), builds the `.dmg`, tags it and publishes the release. The version in `Resources/Info.plist` stays `0.0.0` in the repo. Builds are signed with a self-signed certificate so macOS keeps the audio permissions across updates: `scripts/signing.sh setup` creates it once, stores it in 1Password, sets the GitHub secrets and imports it into your keychain (`scripts/signing.sh import` on another Mac). Without it, builds are ad-hoc signed. After changing the driver, bump `CFBundleVersion` in `Driver/Info.plist` so the app offers the update.
 

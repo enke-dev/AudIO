@@ -71,7 +71,7 @@ final class Router: ObservableObject {
         case (.failed(let text), _): Notice(text: text, isError: true)
         case (_, .failed(let text)): Notice(text: text, isError: true)
         case (_, .starting) where isSlowStart:
-            Notice(text: "Starting… if macOS asks, allow system audio recording", isError: false)
+            Notice(text: String(localized: "Starting… if macOS asks, allow system audio recording"), isError: false)
         default: nil
         }
     }
@@ -162,7 +162,7 @@ final class Router: ObservableObject {
             } catch {
                 isInstallingDriver = false
                 if !(error is CancellationError) {
-                    driverError = "Installing the audio device failed: \(error.localizedDescription)"
+                    driverError = String(localized: "Installing the audio device failed: \(error.localizedDescription)")
                 }
                 reconnect()
             }
@@ -261,14 +261,14 @@ final class Router: ObservableObject {
         guard canMeasure else { return }
         let devices = selectedDevices
 
-        calibration = .measuring("Waiting for microphone access…")
+        calibration = .measuring(String(localized: "Waiting for microphone access…"))
         Task {
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
-                calibration = .failed("Microphone access denied – allow AudIO in Privacy & Security › Microphone")
+                calibration = .failed(String(localized: "Microphone access denied – allow AudIO in Privacy & Security › Microphone"))
                 return
             }
             let seconds = Int(Calibrator.duration(deviceCount: devices.count).rounded(.up))
-            calibration = .measuring("Measuring for about \(seconds) s – keep the room quiet")
+            calibration = .measuring(String(localized: "Measuring for about \(seconds) s – keep the room quiet"))
 
             do {
                 guard let probe = activeProbe else { throw Calibrator.Failure.notRouting }

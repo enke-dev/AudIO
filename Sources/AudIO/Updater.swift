@@ -103,7 +103,7 @@ final class Updater: ObservableObject {
         let dmgURL = repository.appending(path: "releases/download/v\(version)/AudIO-\(version).dmg")
         let (download, response) = try await URLSession.shared.download(from: dmgURL)
         guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-            throw UpdateError("Couldn’t download AudIO \(version).")
+            throw UpdateError(String(localized: "Couldn’t download AudIO \(version)."))
         }
 
         let files = FileManager.default
@@ -142,7 +142,7 @@ final class Updater: ObservableObject {
         guard SecCodeCopyDesignatedRequirement(selfStatic, [], &requirement) == errSecSuccess, let requirement,
               SecStaticCodeCreateWithPath(app as CFURL, [], &newCode) == errSecSuccess, let newCode,
               SecStaticCodeCheckValidity(newCode, [], requirement) == errSecSuccess
-        else { throw UpdateError("The downloaded app isn’t signed like this one – not installed.") }
+        else { throw UpdateError(String(localized: "The downloaded app isn’t signed like this one – not installed.")) }
     }
 
     /// Opens the (new) app once this process has exited, then quits.

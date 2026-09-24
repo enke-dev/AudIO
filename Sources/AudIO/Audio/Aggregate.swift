@@ -47,7 +47,7 @@ enum Aggregate {
         }
         var id = AudioObjectID.unknown
         try AudioHardwareCreateAggregateDevice(description as CFDictionary, &id)
-            .check("Creating the device group")
+            .check(String(localized: "Creating the device group"))
         return id
     }
 

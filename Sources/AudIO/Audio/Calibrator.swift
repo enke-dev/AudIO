@@ -17,10 +17,10 @@ enum Calibrator {
 
         var errorDescription: String? {
             switch self {
-            case .notRouting: "Select AudIO as sound output and tick at least two outputs first"
-            case .noMicrophone: "No microphone found – select an input device in the Sound settings"
+            case .notRouting: String(localized: "Select AudIO as sound output and tick at least two outputs first")
+            case .noMicrophone: String(localized: "No microphone found – select an input device in the Sound settings")
             case .noSignal(let names):
-                "No test tone detected from \(names.joined(separator: ", ")) – turn it up and keep the room quiet"
+                String(localized: "No test tone detected from \(names.formatted(.list(type: .and))) – turn it up and keep the room quiet")
             }
         }
     }

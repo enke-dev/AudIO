@@ -49,6 +49,10 @@ build() {
     mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
     cp "$bin/AudIO" "$app/Contents/MacOS/AudIO"
     cp Resources/Info.plist "$app/Contents/Info.plist"
+    # Translations: the String Catalogs compile into <lang>.lproj/*.strings(dict).
+    for catalog in Resources/Localizable.xcstrings Resources/InfoPlist.xcstrings; do
+        xcrun xcstringstool compile "$catalog" --output-directory "$app/Contents/Resources" >/dev/null
+    done
 
     # Bundled driver, installed from the app ("Install audio device"). Its build also
     # compiles the icon into $icon_dir.

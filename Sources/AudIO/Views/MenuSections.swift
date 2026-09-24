@@ -58,7 +58,7 @@ struct MenuSeparator: View {
 }
 
 struct MenuSectionHeader: View {
-    let title: String
+    let title: LocalizedStringKey
 
     var body: some View {
         Text(title)
@@ -112,7 +112,7 @@ struct MenuSlider: View {
 
 /// A plain menu action ("Toneinstellungen …" style), flush with the content.
 struct MenuActionRow: View {
-    let title: String
+    let title: LocalizedStringKey
     var shortcut: String?
     var isChecked = false
     var isEnabled = true
@@ -132,7 +132,7 @@ struct MenuActionRow: View {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
                 }
                 if let shortcut {
-                    Text(shortcut).foregroundStyle(.secondary)
+                    Text(verbatim: shortcut).foregroundStyle(.secondary)
                 }
             }
             .font(.body)
@@ -154,16 +154,18 @@ struct MenuTitleView: View {
     var body: some View {
         HStack {
             HStack(alignment: .firstTextBaseline, spacing: 5) {
-                Text("AudIO").font(.headline)
-                Text(Self.version).font(.caption).foregroundStyle(.tertiary)
+                Text(verbatim: "AudIO").font(.headline)
+                Text(verbatim: Self.version).font(.caption).foregroundStyle(.tertiary)
             }
             Spacer()
             // Selecting "AudIO" as sound output is the switch; buttons only for what's missing.
             if router.isInstallingDriver || updater.state == .updating {
                 HStack(spacing: 6) {
                     ProgressView().controlSize(.small)
-                    Text(router.isInstallingDriver ? "Installing…" : "Updating…")
-                        .font(.caption).foregroundStyle(.secondary)
+                    Group {
+                        if router.isInstallingDriver { Text("Installing…") } else { Text("Updating…") }
+                    }
+                    .font(.caption).foregroundStyle(.secondary)
                 }
             } else if let title = driverButtonTitle {
                 Button(title) { router.installDriver() }
@@ -195,7 +197,7 @@ struct MenuTitleView: View {
         return version.flatMap { $0 == "0.0.0" ? nil : $0 } ?? "dev"
     }()
 
-    private var driverButtonTitle: String? {
+    private var driverButtonTitle: LocalizedStringKey? {
         switch router.driverState {
         case .notInstalled, .unavailable: router.driver == nil ? "Install Audio Device" : nil
         case .outdated: "Update Audio Device"
@@ -209,7 +211,7 @@ struct MenuNoticeView: View {
     let notice: Router.Notice
 
     var body: some View {
-        Text(notice.text)
+        Text(verbatim: notice.text)
             .font(.caption)
             .foregroundStyle(notice.isError ? Color.red : Color.secondary)
             .fixedSize(horizontal: false, vertical: true)

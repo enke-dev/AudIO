@@ -161,9 +161,9 @@ final class MicRecorder {
         var proc: AudioDeviceIOProcID?
         try AudioDeviceCreateIOProcIDWithBlock(&proc, deviceID, nil) { [unowned self] _, input, inputTime, _, _ in
             self.capture(input, hostTime: inputTime.pointee.mHostTime)
-        }.check("Opening the microphone")
+        }.check(String(localized: "Opening the microphone"))
         procID = proc
-        try AudioDeviceStart(deviceID, proc).check("Starting the microphone")
+        try AudioDeviceStart(deviceID, proc).check(String(localized: "Starting the microphone"))
     }
 
     func stop() {

@@ -71,7 +71,7 @@ final class Engine: @unchecked Sendable {
         tap.deviceUID = source
         tap.stream = 0
         tap.muteBehavior = .unmuted
-        try AudioHardwareCreateProcessTap(tap, &tapID).check("Creating the system audio tap")
+        try AudioHardwareCreateProcessTap(tap, &tapID).check(String(localized: "Creating the system audio tap"))
 
         // 2. Aggregate of the clock device plus all selected outputs, with the tap as input.
         let subDevices = ([clock] + outputs.filter { $0.uid != clock.uid })
@@ -97,7 +97,7 @@ final class Engine: @unchecked Sendable {
         var proc: AudioDeviceIOProcID?
         try AudioDeviceCreateIOProcIDWithBlock(&proc, aggregateID, nil) { _, input, _, output, outputTime in
             graph.render(input: input, output: output, hostTime: outputTime.pointee.mHostTime)
-        }.check("Creating the render callback")
+        }.check(String(localized: "Creating the render callback"))
         procID = proc
 
         listeners = [
@@ -106,6 +106,6 @@ final class Engine: @unchecked Sendable {
             },
         ].compactMap { $0 }
 
-        try AudioDeviceStart(aggregateID, proc).check("Starting audio")
+        try AudioDeviceStart(aggregateID, proc).check(String(localized: "Starting audio"))
     }
 }

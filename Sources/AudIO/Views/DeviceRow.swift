@@ -21,9 +21,9 @@ struct DeviceRow: View {
                         .foregroundStyle(isSelected ? Color.white : Color.primary)
                         .frame(width: MenuMetrics.iconSize, height: MenuMetrics.iconSize)
                         .background(Circle().fill(isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary)))
-                    Text(device.name).font(.body).lineLimit(1)
+                    Text(verbatim: device.name).font(.body).lineLimit(1)
                     if showsID(device) {
-                        Text("#\(device.id)").foregroundStyle(.secondary).monospacedDigit()
+                        Text(verbatim: "#\(device.id)").foregroundStyle(.secondary).monospacedDigit()
                     }
                     Spacer(minLength: 0)
                 }
@@ -52,7 +52,8 @@ struct DeviceDetail: View {
 
     var body: some View {
         let settings = router.binding(for: uid)
-        VStack(spacing: 2) {
+        // A grid, so the sliders line up after the longest label – in any language.
+        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 2) {
             ParameterRow(title: "Level", value: router.volumeBinding(for: uid), range: 0...1, step: 0.01) {
                 "\(Int(($0 * 100).rounded())) %"
             }
@@ -60,6 +61,8 @@ struct DeviceDetail: View {
                 "\(Int($0.rounded())) ms"
             }
         }
+        .font(.caption)
+        .foregroundStyle(.secondary)
         .padding(.leading, MenuMetrics.textInset)
         .padding(.trailing, MenuMetrics.inset)
         .padding(.bottom, 6)
@@ -69,23 +72,22 @@ struct DeviceDetail: View {
 }
 
 private struct ParameterRow: View {
-    let title: String
+    let title: LocalizedStringKey
     @Binding var value: Double
     let range: ClosedRange<Double>
     let step: Double
     let display: (Double) -> String
 
     var body: some View {
-        HStack(spacing: 8) {
-            Text(title)
-                .frame(width: 36, alignment: .leading)
+        GridRow {
+            Text(title).lineLimit(1)
+            // (row height set on a cell – a modifier on the GridRow itself would turn it into
+            // a single cell spanning the grid)
             MenuSlider(value: $value, range: range, step: step, knob: CGSize(width: 20, height: 14), track: 4)
-            Text(display(value))
+                .frame(height: 22)
+            Text(verbatim: display(value))
                 .monospacedDigit()
                 .frame(width: 44, alignment: .trailing)
         }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .frame(height: 22)
     }
 }

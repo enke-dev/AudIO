@@ -1,0 +1,220 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAudioCaptureUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO zachytává zvukový výstup systému, aby jej přehrával na více zařízeních najednou."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO opfanger systemets lydudgang for at afspille den på flere enheder på én gang."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO greift die Tonausgabe des Systems ab, um sie auf mehreren Geräten gleichzeitig wiederzugeben."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO taps the system audio output to play it on several devices at once."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO captura la salida de audio del sistema para reproducirla en varios dispositivos a la vez."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO kaappaa järjestelmän äänen ulostulon toistaakseen sen usealla laitteella yhtä aikaa."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO capte la sortie audio du système pour la lire sur plusieurs appareils à la fois."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO acquisisce l’uscita audio del sistema per riprodurla su più dispositivi contemporaneamente."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIOはシステムのオーディオ出力を取得し、複数のデバイスで同時に再生します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO는 시스템 오디오 출력을 캡처하여 여러 기기에서 동시에 재생합니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO fanger opp systemets lydutgang for å spille den av på flere enheter samtidig."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO tapt de geluidsuitvoer van het systeem af om die op meerdere apparaten tegelijk af te spelen."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO przechwytuje systemowe wyjście dźwięku, aby odtwarzać je na kilku urządzeniach jednocześnie."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O AudIO captura a saída de áudio do sistema para reproduzi-la em vários dispositivos ao mesmo tempo."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO fångar upp systemets ljudutgång för att spela upp den på flera enheter samtidigt."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO перехоплює системний аудіовихід, щоб відтворювати його на кількох пристроях одночасно."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO 会捕获系统音频输出，以便同时在多个设备上播放。"
+          }
+        }
+      }
+    },
+    "NSMicrophoneUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO poslouchá krátké testovací tóny, aby změřil a srovnal zpoždění každého výstupu."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO lytter til korte testtoner for at måle og afstemme forsinkelsen på hver udgang."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO hört kurze Testtöne ab, um die Verzögerung jeder Ausgabe zu messen und anzugleichen."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO listens to short test tones to measure and align the delay of each output."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO escucha breves tonos de prueba para medir y alinear el retardo de cada salida."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO kuuntelee lyhyitä testiääniä mitatakseen ja tasatakseen kunkin ulostulon viiveen."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO écoute de courts signaux de test pour mesurer et aligner le délai de chaque sortie."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO ascolta brevi toni di prova per misurare e allineare il ritardo di ogni uscita."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIOは短いテストトーンを聞き取り、各出力の遅延を測定して揃えます。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO는 짧은 테스트 톤을 듣고 각 출력의 지연을 측정하여 맞춥니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO lytter til korte testtoner for å måle og justere forsinkelsen på hver utgang."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO luistert naar korte testtonen om de vertraging van elke uitvoer te meten en gelijk te trekken."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO nasłuchuje krótkich dźwięków testowych, aby zmierzyć i wyrównać opóźnienie każdego wyjścia."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O AudIO escuta breves tons de teste para medir e alinhar o atraso de cada saída."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO lyssnar på korta testtoner för att mäta och justera fördröjningen för varje utgång."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO прослуховує короткі тестові сигнали, щоб виміряти й вирівняти затримку кожного виходу."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO 会收听短测试音，以测量并对齐每个输出的延迟。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

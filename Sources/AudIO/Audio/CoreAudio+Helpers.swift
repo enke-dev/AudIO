@@ -6,7 +6,7 @@ struct CoreAudioError: LocalizedError {
     let operation: String
 
     var errorDescription: String? {
-        "\(operation) failed (\(fourCharCode(UInt32(bitPattern: status))))"
+        String(localized: "\(operation) failed (\(fourCharCode(UInt32(bitPattern: status))))")
     }
 }
 
@@ -56,7 +56,7 @@ extension AudioObjectID {
         var address = address
         try withUnsafeBytes(of: value) { bytes in
             try AudioObjectSetPropertyData(self, &address, 0, nil, UInt32(bytes.count), bytes.baseAddress!)
-                .check("Writing \(fourCharCode(address.mSelector))")
+                .check(String(localized: "Writing \(fourCharCode(address.mSelector))"))
         }
     }
 
@@ -68,7 +68,7 @@ extension AudioObjectID {
         try withUnsafeMutableBytes(of: &value) { buffer in
             AudioObjectGetPropertyData(self, &address, 0, nil, &size, buffer.baseAddress!)
         }
-        .check("Reading \(fourCharCode(address.mSelector))")
+        .check(String(localized: "Reading \(fourCharCode(address.mSelector))"))
         return value
     }
 
@@ -81,10 +81,10 @@ extension AudioObjectID {
         var address = address
         var size: UInt32 = 0
         try AudioObjectGetPropertyDataSize(self, &address, 0, nil, &size)
-            .check("Sizing \(fourCharCode(address.mSelector))")
+            .check(String(localized: "Sizing \(fourCharCode(address.mSelector))"))
         var ids = [AudioObjectID](repeating: .unknown, count: Int(size) / MemoryLayout<AudioObjectID>.size)
         try AudioObjectGetPropertyData(self, &address, 0, nil, &size, &ids)
-            .check("Reading \(fourCharCode(address.mSelector))")
+            .check(String(localized: "Reading \(fourCharCode(address.mSelector))"))
         return ids
     }
 
@@ -93,7 +93,7 @@ extension AudioObjectID {
         var value: Unmanaged<CFString>?
         var size = UInt32(MemoryLayout<Unmanaged<CFString>?>.size)
         try AudioObjectGetPropertyData(self, &address, 0, nil, &size, &value)
-            .check("Reading \(fourCharCode(address.mSelector))")
+            .check(String(localized: "Reading \(fourCharCode(address.mSelector))"))
         return value?.takeRetainedValue() as String? ?? ""
     }
 

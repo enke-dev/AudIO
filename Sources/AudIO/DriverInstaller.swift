@@ -32,7 +32,7 @@ enum DriverInstaller {
     }
 
     static func install() async throws {
-        guard let source = bundledURL else { throw Failure(message: "This build has no bundled driver") }
+        guard let source = bundledURL else { throw Failure(message: String(localized: "This build has no bundled driver")) }
         let target = quoted(installURL.path)
         // Copied from a downloaded app, the driver carries the quarantine flag – strip it,
         // or Core Audio won't load the (ad-hoc signed) bundle.
