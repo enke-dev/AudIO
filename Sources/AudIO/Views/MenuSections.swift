@@ -117,6 +117,8 @@ struct MenuSlider: View {
         }
         .frame(height: knob.height)
         .allowsHitTesting(isEnabled)
+        // Faded as one image – per part, the track showed through the knob.
+        .compositingGroup()
         .opacity(isEnabled ? 1 : 0.5)
     }
 }
