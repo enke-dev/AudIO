@@ -3,6 +3,7 @@ import SwiftUI
 /// The panel content, laid out like the system's Sound menu.
 struct MenuView: View {
     @EnvironmentObject private var router: Router
+    @EnvironmentObject private var updater: Updater
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -13,6 +14,9 @@ struct MenuView: View {
                     dismiss: { router.dismissActionError() },
                     hold: { router.holdActionError($0) }
                 )
+            } else if case .failed(let message) = updater.state {
+                // Why the update failed – "Update Failed" in the corner retries.
+                MenuNoticeView(notice: .init(text: message, isError: true))
             }
             if router.driver != nil {
                 MasterVolumeView()

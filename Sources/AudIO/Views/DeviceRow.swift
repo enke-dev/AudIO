@@ -31,7 +31,6 @@ struct DeviceRow: View {
                 .menuRowHighlight(isEnabled: router.isReady)
             }
             .buttonStyle(.plain)
-            .help(device.uid)
             .disabled(!router.isReady)
         }
     }
@@ -71,7 +70,6 @@ struct BluetoothRow: View {
             .menuRowHighlight(isEnabled: router.isReady && !isConnecting)
         }
         .buttonStyle(.plain)
-        .help("Connects the device and plays on it")
         .disabled(!router.isReady || isConnecting)
     }
 }

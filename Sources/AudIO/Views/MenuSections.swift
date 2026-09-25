@@ -197,19 +197,16 @@ struct MenuTitleView: View {
                 Pill(text: Text(title), style: .filled, action: router.installDriver)
                     .disabled(router.driverState == .unavailable)
                     .inCorner()
-                    .help("Adds “AudIO” as a sound output – asks for your password")
             } else if router.driver != nil, !router.isDriverActive {
                 Pill(text: Text("Use AudIO"), style: .filled, action: router.activate)
                     .inCorner()
-                    .help("Selects “AudIO” as sound output – same as picking it in the Sound menu")
             } else if case .available(let version) = updater.state {
                 Pill(text: Text("Update to \(version)"), style: .filled, action: updater.install)
                     .inCorner()
-                    .help("Downloads AudIO \(version) from GitHub, replaces this version and restarts")
-            } else if case .failed(let message) = updater.state {
+            } else if case .failed = updater.state {
+                // (the reason shows below the title)
                 Pill(text: Text("Update Failed"), tint: .red, style: .filled, action: updater.retry)
                     .inCorner()
-                    .help("\(message) Click to try again.")
             }
         }
         .frame(height: 22)
@@ -365,7 +362,7 @@ private struct PillCloseButton: View {
         .buttonStyle(.plain)
         .foregroundStyle(tint)
         .onHover { isHovered = $0 }
-        .help("Close")
+        .accessibilityLabel(Text("Close"))
     }
 }
 
@@ -405,13 +402,11 @@ struct MenuActionsView: View {
             ) {
                 router.measureDelays()
             }
-            .help("Plays a short test tone on each selected output and measures when it arrives")
             // Locked with the other controls – the checks themselves run regardless, and an
             // available update still shows in the title.
             MenuActionRow(title: "Check for Updates", isChecked: updater.isEnabled, isEnabled: router.isReady) {
                 updater.isEnabled.toggle()
             }
-            .help("Looks for a new release on GitHub at launch and once a day")
             MenuActionRow(title: "Open at Login", isChecked: launchAtLogin, isEnabled: router.isReady && LaunchAtLogin.isAvailable) {
                 LaunchAtLogin.set(!launchAtLogin)
                 launchAtLogin = LaunchAtLogin.isEnabled
