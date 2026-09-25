@@ -26,10 +26,11 @@ enum MenuMetrics {
     /// Where labels start (and where level/delay line up).
     static let textInset = inset + iconSize + iconSpacing
     /// Symbol column left of a slider (master, level, delay) – fixed, so all sliders start
-    /// at the same x, whatever the symbol.
-    static let sliderIconWidth: CGFloat = 20
+    /// at the same x, whatever the symbol. With the spacing, like the Sound menu (macOS 27,
+    /// measured): the speaker 2.5 pt in, the slider 20 pt in, 8.5 pt after the speaker.
+    static let sliderIconWidth: CGFloat = 14
     /// Symbol → slider.
-    static let sliderSpacing: CGFloat = 8
+    static let sliderSpacing: CGFloat = 6
     /// Level/delay opening – the panel grows along in the same SwiftUI animation.
     static let animation = Animation.easeInOut(duration: 0.25)
 }
@@ -375,10 +376,12 @@ struct MasterVolumeView: View {
             Image(systemName: router.isDriverMuted ? "speaker.slash.fill" : "speaker.fill")
                 .frame(width: MenuMetrics.sliderIconWidth)
             MenuSlider(value: router.driverVolumeBinding())
-            Image(systemName: "speaker.wave.3.fill")
+            // The symbol's own space on its left: 7 pt to the slider, as in the Sound menu.
+            Image(systemName: "speaker.wave.3.fill").padding(.leading, -1.5)
         }
-        .font(.system(size: 15))
-        .foregroundStyle(.secondary)
+        // Like the Sound menu's (measured): 16 pt, brighter than `.secondary`.
+        .font(.system(size: 16))
+        .foregroundStyle(Color.primary.opacity(0.55))
         .frame(height: 26)
         .padding(.horizontal, MenuMetrics.inset)
         .disabled(!router.isReady)
