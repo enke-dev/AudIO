@@ -12,6 +12,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusSubscription: AnyCancellable?
     private var clickMonitor: Any?
     private var wasInstalling = false
+    private var terminationSignal: DispatchSourceSignal?
 
     func applicationWillTerminate(_ notification: Notification) {
         panelLog.notice("terminating")
@@ -22,9 +23,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel?.hide()
     }
 
+    /// `kill`/`pkill` (SIGTERM) would end the process without `applicationWillTerminate` –
+    /// and leave an open panel's session, so the menu bar, stuck. Quit properly instead.
+    private func quitOnTerminationSignal() {
+        signal(SIGTERM, SIG_IGN)
+        let source = DispatchSource.makeSignalSource(signal: SIGTERM, queue: .main)
+        source.setEventHandler { NSApp.terminate(nil) }
+        source.resume()
+        terminationSignal = source
+    }
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         panelLog.notice("launched \(Bundle.main.bundlePath, privacy: .public)")
         quitOtherInstances()
+        quitOnTerminationSignal()
 
         // Status item first: the router's first Core Audio queries can block if coreaudiod
         // hangs – the icon should still appear.
