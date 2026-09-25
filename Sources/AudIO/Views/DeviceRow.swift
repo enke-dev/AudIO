@@ -42,6 +42,40 @@ struct DeviceRow: View {
     }
 }
 
+/// A paired Bluetooth device that isn't connected, like in the Sound menu: dimmed, and
+/// connected (then played on) with a click. A spinner in place of its symbol meanwhile.
+struct BluetoothRow: View {
+    let device: BluetoothDevice
+    @EnvironmentObject private var router: Router
+
+    var body: some View {
+        let isConnecting = router.connecting.contains(device.address)
+        Button {
+            router.connect(device)
+        } label: {
+            HStack(spacing: MenuMetrics.iconSpacing) {
+                Group {
+                    if isConnecting {
+                        ProgressView().controlSize(.small)
+                    } else {
+                        Image(systemName: device.symbolName).font(.system(size: 12, weight: .semibold))
+                    }
+                }
+                .foregroundStyle(.secondary)
+                .frame(width: MenuMetrics.iconSize, height: MenuMetrics.iconSize)
+                .background(Circle().fill(.quaternary))
+                Text(verbatim: device.name).font(.body).foregroundStyle(.secondary).lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .frame(height: MenuMetrics.rowHeight)
+            .menuRowHighlight(isEnabled: router.isReady && !isConnecting)
+        }
+        .buttonStyle(.plain)
+        .help("Connects the device and plays on it")
+        .disabled(!router.isReady || isConnecting)
+    }
+}
+
 /// Level and delay of a selected output, below its row: symbol and slider aligned with the
 /// master volume's, then value and label ("240 ms Delay") – on a
 /// lighter band spanning the panel's full width, like the Sound menu's expanded AirPods

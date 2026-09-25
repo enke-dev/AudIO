@@ -132,6 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func showPanel() {
         guard let panel, let button = statusItem?.button, !panel.isVisible else { return }
+        router?.refreshBluetooth() // pairing happens elsewhere, without a device change
         panel.show(below: button)
     }
 }

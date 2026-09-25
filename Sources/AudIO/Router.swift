@@ -6,6 +6,7 @@ import OSLog
 import SwiftUI
 
 private let latencyLog = Logger(subsystem: "dev.enke.AudIO", category: "latency")
+private let routingLog = Logger(subsystem: "dev.enke.AudIO", category: "routing")
 
 /// Main-thread state: device list, user settings, and reconciling both with the engine.
 @MainActor
@@ -321,6 +322,90 @@ final class Router: ObservableObject {
         }
     }
 
+    // MARK: - Bluetooth
+
+    /// Paired Bluetooth audio devices without a sound output – listed after the outputs.
+    @Published private(set) var bluetoothDevices: [BluetoothDevice] = []
+    /// Addresses being connected.
+    @Published private(set) var connecting: Set<String> = []
+
+    func refreshBluetooth() {
+        // Remember how outputs look, for when they have none (out of the ears, disconnected).
+        let seen = devices.reduce(into: [String: BluetoothLook]()) { result, output in
+            guard let address = Bluetooth.address(of: output) else { return }
+            result[address] = BluetoothLook(name: output.name, symbolName: output.symbolName)
+        }
+        var looks = store.bluetoothLooks
+        if seen.contains(where: { looks[$0.key] != $0.value }) {
+            looks.merge(seen) { $1 }
+            store.bluetoothLooks = looks
+        }
+        bluetoothDevices = Bluetooth.audioDevices()
+            .filter { device in !devices.contains { Bluetooth.matches(uid: $0.uid, address: device.address) } }
+            .map { device in
+                looks[device.address].map {
+                    BluetoothDevice(address: device.address, name: $0.name, symbolName: $0.symbolName)
+                } ?? device
+            }
+    }
+
+    /// Connects a paired device and plays on it. Its output is ticked up front (its UID
+    /// follows from the address), so when macOS makes it the system output right away,
+    /// AudIO takes over again (see `takeOverFromNewDevice`).
+    func connect(_ device: BluetoothDevice) {
+        guard !connecting.contains(device.address) else { return }
+        connecting.insert(device.address)
+        dismissActionError()
+        let expectedUID = "\(device.address):output"
+        let wasSelected = routes[expectedUID]?.isSelected ?? false
+        routes[expectedUID, default: RouteSettings()].isSelected = true
+        Task {
+            defer {
+                connecting.remove(device.address)
+                refreshBluetooth()
+            }
+            let failed = String(localized: "Couldn’t connect \(device.name)")
+            let isConnected = await Bluetooth.connect(address: device.address)
+            // The output shows up a moment later (debounced device list).
+            let output = isConnected ? await appearingOutput(address: device.address) : nil
+            guard let output else {
+                routes[expectedUID]?.isSelected = wasSelected
+                return showActionError(failed)
+            }
+            if output.uid != expectedUID {
+                withAnimation(MenuMetrics.animation) { routes[output.uid, default: RouteSettings()].isSelected = true }
+            }
+        }
+    }
+
+    private func appearingOutput(address: String) async -> OutputDevice? {
+        for _ in 0..<40 {
+            if let output = devices.first(where: { Bluetooth.matches(uid: $0.uid, address: address) }) { return output }
+            try? await Task.sleep(for: .milliseconds(250))
+        }
+        return nil
+    }
+
+    // MARK: - Taking over from macOS
+
+    /// When outputs appeared – macOS makes a device the system output as it connects
+    /// (AirPods put in the ears, a speaker switched on).
+    private var appearedAt: [String: Date] = [:]
+    private static let takeOverWindow: TimeInterval = 5
+
+    /// The system output just switched from AudIO to an output that appeared moments ago
+    /// and is ticked in AudIO – that was macOS, not the user picking it: switch back.
+    /// Returns whether it did.
+    private func takeOverFromNewDevice(wasActive: Bool) -> Bool {
+        guard wasActive, !isDriverActive, let driver, let uid = defaultOutputUID,
+              routes[uid]?.isSelected == true,
+              let appeared = appearedAt[uid], Date().timeIntervalSince(appeared) < Self.takeOverWindow
+        else { return false }
+        routingLog.notice("\(uid, privacy: .public) became the system output as it connected – back to AudIO")
+        Task.detached(priority: .userInitiated) { Devices.setDefaultOutput(driver.id) }
+        return true
+    }
+
     // MARK: - Reconciliation
 
     private var selectedDevices: [OutputDevice] {
@@ -339,13 +424,20 @@ final class Router: ObservableObject {
     }
 
     private func refresh() {
+        let wasActive = isDriverActive
+        let previous = Set(devices.map(\.uid))
         devices = Devices.outputs()
+        let now = Date()
+        devices.filter { !previous.contains($0.uid) }.forEach { appearedAt[$0.uid] = now }
         driver = Devices.virtualDevice()
         driverState = DriverInstaller.state
         defaultOutputID = Devices.defaultOutput()
         defaultOutputUID = devices.first { $0.id == defaultOutputID }?.uid
         syncDriverVolume()
         observeVolumes()
+        refreshBluetooth()
+        // Switching back right away – no need to stop routing in between.
+        if takeOverFromNewDevice(wasActive: wasActive) { return }
         reconcile()
     }
 

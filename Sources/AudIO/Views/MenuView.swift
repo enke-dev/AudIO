@@ -30,6 +30,9 @@ struct MenuView: View {
                     .allowsHitTesting(isSelected)
                     .accessibilityHidden(!isSelected)
             }
+            ForEach(router.bluetoothDevices) { device in
+                BluetoothRow(device: device)
+            }
             MenuSeparator()
             MenuActionsView()
             MenuSeparator()

@@ -10,14 +10,17 @@ struct OutputDevice: Identifiable, Hashable {
     let sampleRate: Double
     /// Whether the device exposes a settable hardware volume (HDMI/DP displays often don't).
     let hasVolumeControl: Bool
+    let symbolName: String
 
-    var symbolName: String {
-        // Like the Sound menu: specific symbols where it has them, a speaker otherwise.
+    /// Like the Sound menu: specific symbols where it has them, a speaker otherwise.
+    static func symbolName(transportType: UInt32, uid: String, modelUID: String?) -> String {
         switch transportType {
         case UInt32(kAudioDeviceTransportTypeBuiltIn): "laptopcomputer"
         case UInt32(kAudioDeviceTransportTypeHDMI),
              UInt32(kAudioDeviceTransportTypeDisplayPort): "display"
         case UInt32(kAudioDeviceTransportTypeAirPlay): "airplayaudio"
+        case UInt32(kAudioDeviceTransportTypeBluetooth),
+             UInt32(kAudioDeviceTransportTypeBluetoothLE): Bluetooth.symbolName(uid: uid, modelUID: modelUID)
         default: "speaker.wave.2.fill"
         }
     }
@@ -76,7 +79,10 @@ enum Devices {
             name: (try? id.readString(.init(kAudioObjectPropertyName))) ?? uid,
             transportType: transport,
             sampleRate: id.value(.init(kAudioDevicePropertyNominalSampleRate), default: Float64(0)),
-            hasVolumeControl: Volume.isControllable(id)
+            hasVolumeControl: Volume.isControllable(id),
+            symbolName: OutputDevice.symbolName(
+                transportType: transport, uid: uid, modelUID: try? id.readString(.init(kAudioDevicePropertyModelUID))
+            )
         )
     }
 

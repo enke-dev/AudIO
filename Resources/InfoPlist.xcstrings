@@ -108,6 +108,113 @@
         }
       }
     },
+    "NSBluetoothAlwaysUsageDescription": {
+      "extractionState": "manual",
+      "localizations": {
+        "cs": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO zobrazuje spárované reproduktory a sluchátka Bluetooth a připojí je, když některé vyberete."
+          }
+        },
+        "da": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO viser dine parrede Bluetooth-højttalere og -hovedtelefoner og forbinder dem, når du vælger en."
+          }
+        },
+        "de": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO zeigt deine gekoppelten Bluetooth-Lautsprecher und -Kopfhörer an und verbindet sie, wenn du einen auswählst."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO lists your paired Bluetooth speakers and headphones and connects them when you pick one."
+          }
+        },
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO muestra tus altavoces y auriculares Bluetooth enlazados y los conecta cuando eliges uno."
+          }
+        },
+        "fi": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO näyttää pariliitetyt Bluetooth-kaiuttimet ja -kuulokkeet ja yhdistää ne, kun valitset jonkin."
+          }
+        },
+        "fr": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO affiche vos haut-parleurs et écouteurs Bluetooth jumelés et les connecte lorsque vous en choisissez un."
+          }
+        },
+        "it": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO mostra gli altoparlanti e le cuffie Bluetooth abbinati e li collega quando ne scegli uno."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIOはペアリング済みのBluetoothスピーカーとヘッドフォンを表示し、選択すると接続します。"
+          }
+        },
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO는 페어링된 Bluetooth 스피커와 헤드폰을 표시하고, 하나를 선택하면 연결합니다."
+          }
+        },
+        "nb": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO viser de sammenkoblede Bluetooth-høyttalerne og -hodetelefonene dine og kobler dem til når du velger en."
+          }
+        },
+        "nl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO toont je gekoppelde Bluetooth-luidsprekers en -koptelefoons en verbindt ze als je er een kiest."
+          }
+        },
+        "pl": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO pokazuje sparowane głośniki i słuchawki Bluetooth i łączy się z nimi, gdy wybierzesz jedno z nich."
+          }
+        },
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O AudIO mostra seus alto-falantes e fones de ouvido Bluetooth emparelhados e os conecta quando você escolhe um."
+          }
+        },
+        "sv": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO visar dina parkopplade Bluetooth-högtalare och -hörlurar och ansluter dem när du väljer en."
+          }
+        },
+        "uk": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO показує ваші під’єднані через Bluetooth динаміки й навушники та під’єднує їх, коли ви вибираєте один із них."
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AudIO 会列出已配对的蓝牙扬声器和耳机，并在你选择时连接它们。"
+          }
+        }
+      }
+    },
     "NSMicrophoneUsageDescription": {
       "extractionState": "manual",
       "localizations": {

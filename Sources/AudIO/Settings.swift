@@ -38,6 +38,7 @@ struct SettingsStore {
         static let routes = "routes"
         static let previousOutput = "previousOutputUID"
         static let resumeDriver = "resumeDriver"
+        static let bluetoothLooks = "bluetoothLooks"
     }
 
     private let defaults = UserDefaults.standard
@@ -54,6 +55,16 @@ struct SettingsStore {
         nonmutating set { defaults.set(newValue, forKey: Key.resumeDriver) }
     }
 
+    /// Name and symbol of Bluetooth outputs, by address – without an output, Bluetooth only
+    /// knows the device's generic name ("AirPods Pro") and class (headphones).
+    var bluetoothLooks: [String: BluetoothLook] {
+        get {
+            defaults.data(forKey: Key.bluetoothLooks)
+                .flatMap { try? JSONDecoder().decode([String: BluetoothLook].self, from: $0) } ?? [:]
+        }
+        nonmutating set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.bluetoothLooks) }
+    }
+
     var routes: [String: RouteSettings] {
         get {
             defaults.data(forKey: Key.routes)
@@ -61,4 +72,9 @@ struct SettingsStore {
         }
         nonmutating set { defaults.set(try? JSONEncoder().encode(newValue), forKey: Key.routes) }
     }
+}
+
+struct BluetoothLook: Codable, Equatable {
+    let name: String
+    let symbolName: String
 }

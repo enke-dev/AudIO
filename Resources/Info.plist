@@ -30,6 +30,8 @@
     <string>14.2</string>
     <key>LSUIElement</key>
     <true/>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>AudIO lists your paired Bluetooth speakers and headphones and connects them when you pick one.</string>
     <key>NSMicrophoneUsageDescription</key>
     <string>AudIO listens to short test tones to measure and align the delay of each output.</string>
     <key>NSAudioCaptureUsageDescription</key>
