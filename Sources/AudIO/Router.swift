@@ -591,6 +591,7 @@ final class Router: ObservableObject {
     private var writtenVolumes: [String: Double] = [:]
     private var lastWrites: [String: Date] = [:]
     private var isUpdatingPremix = false
+    private var pendingVolumeChanges: Set<String> = []
 
     private var effectiveMaster: Double { isDriverMuted ? 0 : driverVolume }
 
@@ -605,14 +606,15 @@ final class Router: ObservableObject {
             ? Set(selectedDevices.filter(\.hasVolumeControl).map(\.uid))
             : []
         for uid in targets.subtracting(premixed) { adoptLevel(of: uid) }
-        // Deselected while routing: back to its own level. When AudIO stops routing the
-        // premixed volumes stay – that's the hand-over.
+        // Deselected while routing: the premixed volume stays, like when AudIO stops routing
+        // (that's the hand-over) – raising it to the level alone made the device loud, and
+        // stay loud when selected again: a volume written before its stream restarted got
+        // lost (Bluetooth), while the device kept reporting it. Only a master mute is lifted.
         if isDriverActive {
-            for uid in premixed.subtracting(targets) {
-                guard let device = devices.first(where: { $0.uid == uid }) else { continue }
-                write(routes[uid]?.level ?? 1, to: device)
-                if Volume.canMute(device.id) { Volume.setMuted(false, on: device.id) }
-            }
+            premixed.subtracting(targets)
+                .compactMap { uid in devices.first { $0.uid == uid } }
+                .filter { Volume.canMute($0.id) }
+                .forEach { Volume.setMuted(false, on: $0.id) }
         }
         premixed = targets
         pushHardwareVolumes()
@@ -668,9 +670,19 @@ final class Router: ObservableObject {
     }
 
     private func observeVolumes() {
+        // The virtual main volume is derived from several properties and reported once for
+        // each (a dozen times per change) – handle it once per run of the main queue.
         let deviceListeners = devices.filter(\.hasVolumeControl).compactMap { device in
             PropertyListener(object: device.id, address: Volume.main) { [weak self] in
-                MainActor.assumeIsolated { self?.hardwareVolumeChanged(device) }
+                MainActor.assumeIsolated {
+                    guard let self, self.pendingVolumeChanges.insert(device.uid).inserted else { return }
+                    DispatchQueue.main.async {
+                        MainActor.assumeIsolated {
+                            self.pendingVolumeChanges.remove(device.uid)
+                            self.hardwareVolumeChanged(device)
+                        }
+                    }
+                }
             }
         }
         let driverListeners = driver.map { driver in
