@@ -107,6 +107,7 @@ final class Router: ObservableObject {
     /// engine itself is only touched on that queue.
     private var activeRoutes: [Route] = []
     private var activeProbe: Probe?
+    private var captureLatency: Double?
     private var isEngineRunning = false
     private var systemListeners: [PropertyListener] = []
     private var volumeListeners: [PropertyListener] = []
@@ -362,11 +363,12 @@ final class Router: ObservableObject {
         isEngineRunning = false
         activeRoutes = []
         activeProbe = nil
+        captureLatency = nil
         status = .starting
 
         engineQueue.async { [engine, weak self] in
             let result = Result { try engine.start(outputs: outputs, clock: clock, source: source) }
-                .map { EngineHandle(routes: engine.routes, probe: engine.probe) }
+                .map { EngineHandle(routes: engine.routes, probe: engine.probe, captureLatency: engine.captureLatency) }
             DispatchQueue.main.async {
                 MainActor.assumeIsolated {
                     self?.engineStarted(request: request, key: key, count: outputs.count, result: result)
@@ -394,6 +396,7 @@ final class Router: ObservableObject {
             failedKey = nil
             runningKey = key
             activeRoutes = handle.routes
+            captureLatency = handle.captureLatency
             activeProbe = handle.probe
             isEngineRunning = true
             status = .routing(count: count)
@@ -413,6 +416,7 @@ final class Router: ObservableObject {
         runningKey = nil
         activeRoutes = []
         activeProbe = nil
+        captureLatency = nil
         isEngineRunning = false
         engineQueue.async { [engine] in engine.stop() }
         self.status = status
@@ -435,19 +439,19 @@ final class Router: ObservableObject {
 
     /// Tells the driver how late routed audio is heard, so video players delay the picture
     /// by that much (like for AirPods used directly): the slowest output's latency (incl.
-    /// Bluetooth, buffers) plus its delay line, and one more IO buffer for the capture.
-    /// Still short of the truth – the capture/drift compensation adds latency Core Audio
-    /// doesn't report (see scripts/lipsync.swift to measure).
+    /// Bluetooth, buffers) plus its delay line, plus the capture (see
+    /// `Engine.captureLatency`). Speakers that under-report stay off, as they are without
+    /// AudIO.
     private func reportLatency() {
         guard let driver else { return }
         let outputs = activeRoutes.compactMap { route in devices.first { $0.uid == route.uid } }
         let slowest = outputs.map { Latency.output(of: $0.id) + (routes[$0.uid]?.delayMs ?? 0) / 1000 }.max()
-        let capture = outputs.first.map { Latency.buffer(of: $0.id) } ?? 0
+        let capture = captureLatency ?? 0
         let latency = slowest.map { $0 + capture } ?? 0
         guard abs((reportedLatency ?? -1) - latency) > 0.001 else { return }
         reportedLatency = latency
         Latency.report(latency, to: driver.id)
-        latencyLog.notice("reported \(Int(latency * 1000), privacy: .public) ms")
+        latencyLog.notice("reported \(Int(latency * 1000), privacy: .public) ms, capture \(Int(capture * 1000), privacy: .public) ms")
     }
 
     // MARK: - Volume
@@ -570,4 +574,5 @@ final class Router: ObservableObject {
 private struct EngineHandle: @unchecked Sendable {
     let routes: [Route]
     let probe: Probe?
+    let captureLatency: Double
 }

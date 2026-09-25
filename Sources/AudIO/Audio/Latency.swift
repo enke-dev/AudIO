@@ -19,12 +19,6 @@ enum Latency {
         return Double(frames + stream) / sampleRate(of: device)
     }
 
-    /// One IO buffer of the device, in seconds.
-    static func buffer(of device: AudioDeviceID) -> Double {
-        let frames = device.value(.init(kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeOutput), default: UInt32(0))
-        return Double(frames) / sampleRate(of: device)
-    }
-
     /// Reports `seconds` as the driver's latency (in its current sample rate's frames).
     static func report(_ seconds: Double, to driver: AudioDeviceID) {
         let frames = Int32(max(0, seconds * sampleRate(of: driver)).rounded())

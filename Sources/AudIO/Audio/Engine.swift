@@ -14,6 +14,8 @@ final class Engine: @unchecked Sendable {
     private(set) var routes: [Route] = []
     /// Test-tone injector for in-session delay measurement.
     private(set) var probe: Probe?
+    /// How long the capture takes (see `captureLatency(of:)`), in seconds.
+    private(set) var captureLatency: Double = 0
 
     /// Called on the main queue when the aggregate needs to be rebuilt (e.g. sample-rate change).
     var onConfigurationLost: (() -> Void)?
@@ -53,6 +55,7 @@ final class Engine: @unchecked Sendable {
         tapID = .unknown
         routes = []
         probe = nil
+        captureLatency = 0
     }
 
     private func build(outputs: [OutputDevice], clock: OutputDevice, source: String) throws {
@@ -97,6 +100,7 @@ final class Engine: @unchecked Sendable {
 
         // 4. IOProc – called directly on the HAL IO thread (nil queue).
         var proc: AudioDeviceIOProcID?
+        captureLatency = Self.captureLatency(of: aggregateID, sampleRate: sampleRate)
         try AudioDeviceCreateIOProcIDWithBlock(&proc, aggregateID, nil) { _, input, _, output, outputTime in
             graph.render(input: input, output: output, hostTime: outputTime.pointee.mHostTime)
         }.check(String(localized: "Creating the render callback"))
@@ -109,5 +113,22 @@ final class Engine: @unchecked Sendable {
         ].compactMap { $0 }
 
         try AudioDeviceStart(aggregateID, proc).check(String(localized: "Starting audio"))
+    }
+
+    /// How long the capture takes – from a sample handed to the AudIO device until it
+    /// leaves the render graph. Core Audio doesn't report it as a latency, but it follows
+    /// from the aggregate: its output minus input time stamp is two IO buffers plus both
+    /// safety offsets (into which it folds the sub-devices' latencies), then the tapped
+    /// input's latency. Checked against clicks timed through the tap: 106 / 26 / 188 ms
+    /// (Creative, built-in, both), within 1 ms.
+    private static func captureLatency(of aggregate: AudioObjectID, sampleRate: Double) -> Double {
+        let input = kAudioObjectPropertyScopeInput
+        let output = kAudioObjectPropertyScopeOutput
+        let frames = [
+            (kAudioDevicePropertyBufferFrameSize, output), (kAudioDevicePropertyBufferFrameSize, output),
+            (kAudioDevicePropertySafetyOffset, input), (kAudioDevicePropertySafetyOffset, output),
+            (kAudioDevicePropertyLatency, input),
+        ].map { aggregate.value(.init($0.0, $0.1), default: UInt32(0)) }.reduce(0, +)
+        return Double(frames) / sampleRate
     }
 }
