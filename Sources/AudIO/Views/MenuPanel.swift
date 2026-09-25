@@ -12,7 +12,7 @@ let panelLog = Logger(subsystem: "dev.enke.AudIO", category: "panel")
 /// panel therefore animate in one pass; resizing the window alongside a SwiftUI animation
 /// makes the two fight each other.
 final class MenuPanel: NSPanel {
-    static let cornerRadius: CGFloat = 16
+    static let cornerRadius = MenuMetrics.panelRadius
     /// Distance to the screen edges; the top sits flush below the icon like system menus.
     private static let screenMargin: CGFloat = 5
     /// Transparent room left/right of the surface for its shadow.

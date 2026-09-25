@@ -31,7 +31,6 @@ final class Router: ObservableObject {
     @Published private(set) var isDriverMuted = false
     @Published private(set) var driverState = DriverInstaller.state
     @Published private(set) var isInstallingDriver = false
-    @Published private(set) var driverError: String?
 
     @Published var routes: [String: RouteSettings] {
         didSet {
@@ -43,18 +42,42 @@ final class Router: ObservableObject {
         }
     }
 
-    enum Calibration: Equatable {
-        case measuring(String)
-        case failed(String)
-    }
-
-    @Published private(set) var calibration: Calibration?
+    /// Progress of a running measurement – shown on the Measure Delays row.
+    @Published private(set) var measuringText: String?
 
     private var isCalibrating: Bool { measuringText != nil }
 
-    /// Progress of a running measurement – shown on the Measure Delays row.
-    var measuringText: String? {
-        if case .measuring(let text) = calibration { text } else { nil }
+    /// What an action (install, measurement, connection) failed with. Shown until dismissed
+    /// or for a while – unlike a failed start, it's no lasting state.
+    @Published private var actionError: String?
+    private var actionErrorTask: Task<Void, Never>?
+    private var isActionErrorHeld = false
+    private static let actionErrorDuration = Duration.seconds(10)
+
+    private func showActionError(_ text: String) {
+        withAnimation(MenuMetrics.animation) { actionError = text }
+        scheduleActionErrorDismissal()
+    }
+
+    func dismissActionError() {
+        actionErrorTask?.cancel()
+        withAnimation(MenuMetrics.animation) { actionError = nil }
+    }
+
+    /// Kept while the pointer is on it – reading it shouldn't make it vanish.
+    func holdActionError(_ held: Bool) {
+        isActionErrorHeld = held
+        if held { actionErrorTask?.cancel() } else { scheduleActionErrorDismissal() }
+    }
+
+    private func scheduleActionErrorDismissal() {
+        actionErrorTask?.cancel()
+        guard actionError != nil, !isActionErrorHeld else { return }
+        actionErrorTask = Task { [weak self] in
+            try? await Task.sleep(for: Self.actionErrorDuration)
+            guard !Task.isCancelled else { return }
+            self?.dismissActionError()
+        }
     }
 
     /// AudIO is the system output – routing runs and the controls are live.
@@ -66,14 +89,15 @@ final class Router: ObservableObject {
     struct Notice: Equatable {
         let text: String
         let isError: Bool
+        /// An action's error – closable, and gone after a while.
+        var isDismissible = false
     }
 
     var notice: Notice? {
-        if let driverError { return Notice(text: driverError, isError: true) }
-        return switch (calibration, status) {
-        case (.failed(let text), _): Notice(text: text, isError: true)
-        case (_, .failed(let text)): Notice(text: text, isError: true)
-        case (_, .starting) where isSlowStart:
+        if let actionError { return Notice(text: actionError, isError: true, isDismissible: true) }
+        return switch status {
+        case .failed(let text): Notice(text: text, isError: true)
+        case .starting where isSlowStart:
             Notice(text: String(localized: "Starting… if macOS asks, allow system audio recording"), isError: false)
         default: nil
         }
@@ -156,7 +180,7 @@ final class Router: ObservableObject {
     func installDriver() {
         guard !isInstallingDriver else { return }
         isInstallingDriver = true
-        driverError = nil
+        dismissActionError()
 
         // Core Audio restarts during the install: every device/tap object we hold dies, and
         // any HAL call on the main thread would block until it's back (= frozen UI). So stop
@@ -176,7 +200,7 @@ final class Router: ObservableObject {
             } catch {
                 isInstallingDriver = false
                 if !(error is CancellationError) {
-                    driverError = String(localized: "Installing the audio device failed: \(error.localizedDescription)")
+                    showActionError(String(localized: "Installing the audio device failed: \(error.localizedDescription)"))
                 }
                 reconnect()
             }
@@ -269,26 +293,29 @@ final class Router: ObservableObject {
         guard canMeasure else { return }
         let devices = selectedDevices
 
-        calibration = .measuring(String(localized: "Waiting for microphone access…"))
+        dismissActionError()
+        measuringText = String(localized: "Waiting for microphone access…")
         Task {
             guard await AVCaptureDevice.requestAccess(for: .audio) else {
-                calibration = .failed(String(localized: "Microphone access denied – allow AudIO in Privacy & Security › Microphone"))
+                measuringText = nil
+                showActionError(String(localized: "Microphone access denied – allow AudIO in Privacy & Security › Microphone"))
                 return
             }
             let seconds = Int(Calibrator.duration(deviceCount: devices.count).rounded(.up))
-            calibration = .measuring(String(localized: "Measuring for about \(seconds) s – keep the room quiet"))
+            measuringText = String(localized: "Measuring for about \(seconds) s – keep the room quiet")
 
             do {
                 guard let probe = activeProbe else { throw Calibrator.Failure.notRouting }
                 let latencies = try await Calibrator.measure(probe: probe, routes: activeRoutes, devices: devices)
                 let slowest = latencies.values.max() ?? 0
-                calibration = nil
+                measuringText = nil
                 // Same device set → reconcile only updates parameters, the stream keeps running.
                 routes = latencies.reduce(into: routes) { result, entry in
                     result[entry.key, default: RouteSettings()].delayMs = (slowest - entry.value).rounded()
                 }
             } catch {
-                calibration = .failed(error.localizedDescription)
+                measuringText = nil
+                showActionError(error.localizedDescription)
                 reconcile()
             }
         }

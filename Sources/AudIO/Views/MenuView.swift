@@ -8,7 +8,11 @@ struct MenuView: View {
         VStack(alignment: .leading, spacing: 0) {
             MenuTitleView()
             if let notice = router.notice {
-                MenuNoticeView(notice: notice)
+                MenuNoticeView(
+                    notice: notice,
+                    dismiss: { router.dismissActionError() },
+                    hold: { router.holdActionError($0) }
+                )
             }
             if router.driver != nil {
                 MasterVolumeView()

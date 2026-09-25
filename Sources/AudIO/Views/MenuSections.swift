@@ -9,10 +9,15 @@ import SwiftUI
 
 enum MenuMetrics {
     static let width: CGFloat = 320
+    static let panelRadius: CGFloat = 16
     /// Content (title, icons, labels, separators) from the menu edge.
     static let inset: CGFloat = 14
-    /// Hover highlight from the menu edge.
+    /// Hover highlight (and error pill) from the menu edge.
     static let highlightInset: CGFloat = 5
+    /// Concentric with the panel's corners (Sound menu: 10, measured).
+    static let highlightRadius = panelRadius - highlightInset
+    /// Panel edge → title row (panel padding + the title's own).
+    static let titleTop: CGFloat = 6 + 6
     static let rowHeight: CGFloat = 32
     static let actionHeight: CGFloat = 22
     static let iconSize: CGFloat = 26
@@ -39,7 +44,7 @@ private struct RowHighlight: ViewModifier {
             .padding(.horizontal, MenuMetrics.inset - MenuMetrics.highlightInset)
             .contentShape(Rectangle())
             .background(
-                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                RoundedRectangle(cornerRadius: MenuMetrics.highlightRadius, style: .continuous)
                     .fill(isHovered && isEnabled ? AnyShapeStyle(.quaternary) : AnyShapeStyle(.clear))
             )
             .onHover { isHovered = $0 }
@@ -186,21 +191,21 @@ struct MenuTitleView: View {
                     ProgressView().controlSize(.small)
                 }
             } else if let title = driverButtonTitle {
-                Button(title) { router.installDriver() }
-                    .controlSize(.small)
+                Pill(text: Text(title), style: .filled, action: router.installDriver)
                     .disabled(router.driverState == .unavailable)
+                    .inCorner()
                     .help("Adds “AudIO” as a sound output – asks for your password")
             } else if router.driver != nil, !router.isDriverActive {
-                Button("Use AudIO") { router.activate() }
-                    .controlSize(.small)
+                Pill(text: Text("Use AudIO"), style: .filled, action: router.activate)
+                    .inCorner()
                     .help("Selects “AudIO” as sound output – same as picking it in the Sound menu")
             } else if case .available(let version) = updater.state {
-                Button("Update to \(version)") { updater.install() }
-                    .controlSize(.small)
+                Pill(text: Text("Update to \(version)"), style: .filled, action: updater.install)
+                    .inCorner()
                     .help("Downloads AudIO \(version) from GitHub, replaces this version and restarts")
             } else if case .failed(let message) = updater.state {
-                Button("Update Failed") { updater.retry() }
-                    .controlSize(.small)
+                Pill(text: Text("Update Failed"), tint: .red, style: .filled, action: updater.retry)
+                    .inCorner()
                     .help("\(message) Click to try again.")
             }
         }
@@ -224,18 +229,140 @@ struct MenuTitleView: View {
     }
 }
 
-/// Errors and a slow start, below the title.
+/// Errors and a slow start, below the title. An action's error is a pill with a close
+/// button that also goes away by itself after a while (not while pointed at).
 struct MenuNoticeView: View {
     let notice: Router.Notice
+    var dismiss: (() -> Void)?
+    var hold: ((Bool) -> Void)?
 
     var body: some View {
-        Text(verbatim: notice.text)
-            .font(.caption)
-            .foregroundStyle(notice.isError ? Color.red : Color.secondary)
-            .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, MenuMetrics.inset)
-            .padding(.bottom, 2)
+        Group {
+            if notice.isDismissible {
+                Pill(text: Text(verbatim: notice.text), tint: .red, close: { dismiss?() }, hold: hold)
+                    // Like a row highlight: from the panel edge, concentric with its corners.
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, MenuMetrics.highlightInset)
+            } else {
+                Text(verbatim: notice.text)
+                    .font(.caption)
+                    .foregroundStyle(notice.isError ? Color.red : Color.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, MenuMetrics.inset)
+            }
+        }
+        .padding(.bottom, 2)
+    }
+}
+
+/// The panel's pill – a message (tinted, may wrap, optionally closable) or a button
+/// (filled, for what's missing: install, select AudIO, an update – it must stand out,
+/// often among disabled controls). One line makes a pill, more a rectangle with the same
+/// rounding: that of the row highlights. Text aligned with the content.
+struct Pill: View {
+    enum Style {
+        /// Tint on a light tint fill.
+        case tinted
+        /// White on the tint.
+        case filled
+    }
+
+    let text: Text
+    var tint: Color = .accentColor
+    var style: Style = .tinted
+    /// Makes it a button – brighter while pointed at.
+    var action: (() -> Void)?
+    /// A close button top right, also when the text wraps.
+    var close: (() -> Void)?
+    /// Pointed at or not – e.g. to keep it while being read.
+    var hold: ((Bool) -> Void)?
+
+    @Environment(\.isEnabled) private var isEnabled
+    @State private var isHovered = false
+
+    var body: some View {
+        if let action {
+            Button(action: action) { pill.contentShape(PillShape()) }
+                .buttonStyle(.plain)
+                .compositingGroup()
+                .opacity(isEnabled ? 1 : 0.4)
+        } else {
+            pill
+        }
+    }
+
+    private var pill: some View {
+        HStack(alignment: .top, spacing: 6) {
+            text
+                .font(action == nil ? .caption : .caption.weight(.medium))
+                .foregroundStyle(style == .filled ? .white : tint)
+                .fixedSize(horizontal: false, vertical: true)
+            if let close { PillCloseButton(tint: tint, action: close) }
+        }
+        // Buttons stay on one line; a close button's center sits one corner radius from the
+        // top and trailing edge – its hover circle concentric with the rounding.
+        .lineLimit(action == nil ? nil : 1)
+        .padding(.leading, MenuMetrics.inset - MenuMetrics.highlightInset)
+        .padding(.trailing, close == nil ? MenuMetrics.inset - MenuMetrics.highlightInset : PillShape.radius - PillCloseButton.size / 2)
+        .padding(.vertical, PillShape.radius - PillCloseButton.size / 2)
+        .frame(minHeight: PillShape.radius * 2)
+        .background(PillShape().fill(style == .filled ? tint : tint.opacity(0.15)))
+        .brightness(action != nil && isHovered && isEnabled ? 0.08 : 0)
+        .onHover { hovering in
+            isHovered = hovering
+            hold?(hovering)
+        }
+    }
+}
+
+/// A pill on one line (as high as the close button plus its padding); on more, a
+/// rectangle with the same corner rounding – that of the row highlights.
+private struct PillShape: Shape {
+    static let radius = MenuMetrics.highlightRadius
+
+    func path(in rect: CGRect) -> Path {
+        Path(roundedRect: rect, cornerRadius: min(rect.height / 2, Self.radius), style: .continuous)
+    }
+}
+
+extension View {
+    /// A title-row pill moved into the panel's top-right corner: as far from the top as
+    /// from the side, concentric with the panel's rounding (a pill's radius is the
+    /// highlights'). Only drawn there – the title row keeps its layout.
+    func inCorner() -> some View {
+        offset(
+            x: MenuMetrics.inset - MenuMetrics.highlightInset,
+            y: MenuMetrics.highlightInset - MenuMetrics.titleTop
+        )
+    }
+}
+
+/// The pill's close button: a round background while pointed at.
+private struct PillCloseButton: View {
+    static let size: CGFloat = 14
+    /// The hover circle's gap to the pill's edge, all around.
+    private static let gap: CGFloat = 3
+    /// Concentric with the pill's rounding – drawn beyond the button's frame, into the
+    /// pill's padding, so a single line stays a pill.
+    private static let outset = PillShape.radius - gap - size / 2
+
+    let tint: Color
+    let action: () -> Void
+    @State private var isHovered = false
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 8, weight: .bold))
+                .frame(width: Self.size, height: Self.size)
+                .background(Circle().fill(tint.opacity(isHovered ? 0.2 : 0)).padding(-Self.outset))
+                .contentShape(Circle().inset(by: -Self.outset))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(tint)
+        .onHover { isHovered = $0 }
+        .help("Close")
     }
 }
 
