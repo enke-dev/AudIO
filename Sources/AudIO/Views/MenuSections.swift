@@ -89,6 +89,7 @@ struct MenuSlider: View {
     var track: CGFloat = 6
 
     @Environment(\.isEnabled) private var isEnabled
+    @State private var scrolling = ScrollMonitor()
 
     var body: some View {
         GeometryReader { geometry in
@@ -110,17 +111,55 @@ struct MenuSlider: View {
             .gesture(
                 DragGesture(minimumDistance: 0).onChanged { drag in
                     let fraction = Double((drag.location.x - knob.width / 2) / usable).clamped01
-                    let raw = range.lowerBound + fraction * span
-                    value = step.map { (raw / $0).rounded() * $0 } ?? raw
+                    set(range.lowerBound + fraction * span)
                 }
             )
+            // Scrolling over it moves it, like the Sound menu's: a trackpad as far as the
+            // fingers go, a mouse wheel in steps.
+            .onHover { isHovered in
+                scrolling.watch(isHovered && isEnabled) { event in
+                    let delta = Self.physical(event)
+                    let fraction = event.hasPreciseScrollingDeltas ? delta / usable : delta * 0.04
+                    set(value + Double(fraction) * span)
+                }
+            }
         }
         .frame(height: knob.height)
         .allowsHitTesting(isEnabled)
         // Faded as one image – per part, the track showed through the knob.
         .compositingGroup()
         .opacity(isEnabled ? 1 : 0.5)
+        .onDisappear { scrolling.watch(false) }
     }
+
+    private func set(_ raw: Double) {
+        let clamped = min(max(raw, range.lowerBound), range.upperBound)
+        value = step.map { (clamped / $0).rounded() * $0 } ?? clamped
+    }
+
+    /// Up and right raise it – where the fingers or the wheel go, whatever the scroll
+    /// direction setting. (Horizontal deltas count the other way round: positive is left.)
+    private static func physical(_ event: NSEvent) -> CGFloat {
+        let sign: CGFloat = event.isDirectionInvertedFromDevice ? -1 : 1
+        return sign * (event.scrollingDeltaY - event.scrollingDeltaX)
+    }
+}
+
+/// Scroll events over a view, while `watch`ed: SwiftUI has no scroll wheel handler here.
+private final class ScrollMonitor {
+    private var monitor: Any?
+
+    func watch(_ isOn: Bool, handler: @escaping (NSEvent) -> Void = { _ in }) {
+        if let monitor { NSEvent.removeMonitor(monitor) }
+        monitor = nil
+        guard isOn else { return }
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { event in
+            handler(event)
+            return nil // consumed – nothing else in the panel scrolls
+        }
+    }
+
+    deinit { if let monitor { NSEvent.removeMonitor(monitor) } }
 }
 
 /// A plain menu action ("Toneinstellungen …" style), flush with the content.
