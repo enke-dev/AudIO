@@ -1303,7 +1303,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Installieren …"
+            "value": "Installieren…"
           }
         },
         "en": {
@@ -4085,7 +4085,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Aktualisieren …"
+            "value": "Aktualisieren…"
           }
         },
         "en": {
@@ -4299,7 +4299,7 @@
         "de": {
           "stringUnit": {
             "state": "translated",
-            "value": "Warten auf Mikrofonzugriff …"
+            "value": "Warten auf Mikrofonzugriff…"
           }
         },
         "en": {
@@ -4347,7 +4347,7 @@
         "nb": {
           "stringUnit": {
             "state": "translated",
-            "value": "Venter på tilgang til mikrofonen …"
+            "value": "Venter på tilgang til mikrofonen…"
           }
         },
         "nl": {
