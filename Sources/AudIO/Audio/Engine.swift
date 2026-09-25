@@ -64,12 +64,14 @@ final class Engine: @unchecked Sendable {
         if !ownProcess.isValid {
             log.warning("Own process object not found; the tap will not exclude AudIO")
         }
-        let tap = CATapDescription(stereoGlobalTapButExcludeProcesses: ownProcess.isValid ? [ownProcess] : [])
+        // The device initializer: a global tap with `deviceUID` set afterwards still captures
+        // every device – system sounds played straight to an output came out twice.
+        let tap = CATapDescription(
+            excludingProcesses: ownProcess.isValid ? [ownProcess] : [], deviceUID: source, stream: 0
+        )
         tap.name = "AudIO"
         tap.uuid = UUID()
         tap.isPrivate = true
-        tap.deviceUID = source
-        tap.stream = 0
         tap.muteBehavior = .unmuted
         try AudioHardwareCreateProcessTap(tap, &tapID).check(String(localized: "Creating the system audio tap"))
 
