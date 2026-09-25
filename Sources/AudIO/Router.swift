@@ -50,8 +50,11 @@ final class Router: ObservableObject {
 
     @Published private(set) var calibration: Calibration?
 
-    private var isCalibrating: Bool {
-        if case .measuring = calibration { true } else { false }
+    private var isCalibrating: Bool { measuringText != nil }
+
+    /// Progress of a running measurement – shown on the Measure Delays row.
+    var measuringText: String? {
+        if case .measuring(let text) = calibration { text } else { nil }
     }
 
     /// AudIO is the system output – routing runs and the controls are live.
@@ -59,7 +62,7 @@ final class Router: ObservableObject {
         driver.map { $0.id == defaultOutputID } ?? false
     }
 
-    /// A line under the title – only for what needs attention: errors, a running measurement.
+    /// A line under the title – only for what needs attention: errors, a slow start.
     struct Notice: Equatable {
         let text: String
         let isError: Bool
@@ -68,7 +71,6 @@ final class Router: ObservableObject {
     var notice: Notice? {
         if let driverError { return Notice(text: driverError, isError: true) }
         return switch (calibration, status) {
-        case (.measuring(let text), _): Notice(text: text, isError: false)
         case (.failed(let text), _): Notice(text: text, isError: true)
         case (_, .failed(let text)): Notice(text: text, isError: true)
         case (_, .starting) where isSlowStart:
@@ -77,9 +79,10 @@ final class Router: ObservableObject {
         }
     }
 
-    /// Controls are live: driver installed, AudIO is the sound output, no install running.
+    /// Controls are live: driver installed, AudIO is the sound output, no install or
+    /// measurement running.
     var isReady: Bool {
-        driver != nil && isDriverActive && !isInstallingDriver
+        driver != nil && isDriverActive && !isInstallingDriver && !isCalibrating
     }
 
     /// Selects AudIO as system output (the header button when it isn't).

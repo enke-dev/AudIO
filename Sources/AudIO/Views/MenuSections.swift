@@ -118,6 +118,8 @@ struct MenuSlider: View {
 /// A plain menu action ("Toneinstellungen …" style), flush with the content.
 struct MenuActionRow: View {
     let title: LocalizedStringKey
+    /// Replaces `title` with an already localized text (e.g. a running action's progress).
+    var verbatimTitle: String?
     var shortcut: String?
     var isChecked = false
     var isEnabled = true
@@ -131,7 +133,11 @@ struct MenuActionRow: View {
             if isEnabled { action() }
         } label: {
             HStack {
-                Text(title)
+                Group {
+                    if let verbatimTitle { Text(verbatim: verbatimTitle) } else { Text(title) }
+                }
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 Spacer()
                 if isChecked {
                     Image(systemName: "checkmark").font(.system(size: 11, weight: .semibold))
@@ -164,13 +170,20 @@ struct MenuTitleView: View {
             }
             Spacer()
             // Selecting "AudIO" as sound output is the switch; buttons only for what's missing.
-            if router.isInstallingDriver || updater.state == .updating {
+            if router.isInstallingDriver || router.measuringText != nil || updater.state == .updating {
+                // Label first, spinner last – always in the top-right corner.
                 HStack(spacing: 6) {
-                    ProgressView().controlSize(.small)
                     Group {
-                        if router.isInstallingDriver { Text("Installing…") } else { Text("Updating…") }
+                        if router.isInstallingDriver {
+                            Text("Installing…")
+                        } else if router.measuringText != nil {
+                            Text("Measuring…")
+                        } else {
+                            Text("Updating…")
+                        }
                     }
                     .font(.caption).foregroundStyle(.secondary)
+                    ProgressView().controlSize(.small)
                 }
             } else if let title = driverButtonTitle {
                 Button(title) { router.installDriver() }
@@ -211,7 +224,7 @@ struct MenuTitleView: View {
     }
 }
 
-/// Errors and a running measurement, below the title.
+/// Errors and a slow start, below the title.
 struct MenuNoticeView: View {
     let notice: Router.Notice
 
@@ -249,18 +262,21 @@ struct MasterVolumeView: View {
 struct MenuActionsView: View {
     @EnvironmentObject private var router: Router
     @EnvironmentObject private var updater: Updater
-    /// Closes the panel before an action that takes over (the measurement).
-    var close: () -> Void = {}
     @State private var launchAtLogin = LaunchAtLogin.isEnabled
 
     var body: some View {
         VStack(spacing: 0) {
-            MenuActionRow(title: "Measure Delays", isEnabled: router.isReady && router.canMeasure) {
-                close()
+            // The panel stays open: the running measurement shows in place of the title.
+            MenuActionRow(
+                title: "Measure Delays", verbatimTitle: router.measuringText,
+                isEnabled: router.isReady && router.canMeasure
+            ) {
                 router.measureDelays()
             }
             .help("Plays a short test tone on each selected output and measures when it arrives")
-            MenuActionRow(title: "Check for Updates", isChecked: updater.isEnabled) {
+            // Locked with the other controls – the checks themselves run regardless, and an
+            // available update still shows in the title.
+            MenuActionRow(title: "Check for Updates", isChecked: updater.isEnabled, isEnabled: router.isReady) {
                 updater.isEnabled.toggle()
             }
             .help("Looks for a new release on GitHub at launch and once a day")

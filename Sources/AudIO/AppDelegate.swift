@@ -34,7 +34,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         let router = Router()
         self.router = router
-        let panel = MenuPanel(rootView: MenuView(close: { [weak self] in self?.panel?.dismiss() })
+        let panel = MenuPanel(rootView: MenuView()
             .environmentObject(router)
             .environmentObject(updater))
         self.panel = panel

@@ -3,8 +3,6 @@ import SwiftUI
 /// The panel content, laid out like the system's Sound menu.
 struct MenuView: View {
     @EnvironmentObject private var router: Router
-    /// Closes the panel before an action that takes over (the measurement).
-    var close: () -> Void = {}
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -29,7 +27,7 @@ struct MenuView: View {
                     .accessibilityHidden(!isSelected)
             }
             MenuSeparator()
-            MenuActionsView(close: close)
+            MenuActionsView()
             MenuSeparator()
             MenuQuitRow()
         }
