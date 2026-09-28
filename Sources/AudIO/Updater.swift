@@ -57,8 +57,9 @@ final class Updater: ObservableObject {
     }
 
     func check() {
-        // Local builds are 0.0.0 (CI stamps the version) – nothing to compare against.
-        guard isEnabled, current != "0.0.0", state != .updating else { return }
+        // Local builds are 0.0.0 (CI stamps the version), so any release is newer: one click
+        // swaps a development build for the released one.
+        guard isEnabled, state != .updating else { return }
         defaults.set(Date(), forKey: Key.lastCheck)
         Task {
             guard let latest = try? await Self.latestVersion(),
