@@ -4,6 +4,7 @@ import AudioToolbox
 import CoreAudio
 import OSLog
 import SwiftUI
+import WidgetKit
 
 private let latencyLog = Logger(subsystem: "dev.enke.AudIO", category: "latency")
 private let routingLog = Logger(subsystem: "dev.enke.AudIO", category: "routing")
@@ -40,6 +41,7 @@ final class Router: ObservableObject {
             let selected = { (routes: [String: RouteSettings]) in Set(routes.filter { $0.value.isSelected }.keys) }
             if selected(routes) != selected(oldValue) { failedKey = nil }
             reconcile()
+            publishToWidget()
         }
     }
 
@@ -157,6 +159,7 @@ final class Router: ObservableObject {
             MainActor.assumeIsolated { self?.shutdown() }
         }
         refresh()
+        observeWidget()
         if store.resumeDriver, driver != nil, !isDriverActive { selectAudIO(true) }
     }
 
@@ -274,14 +277,16 @@ final class Router: ObservableObject {
             set: { [weak self] value in
                 MainActor.assumeIsolated {
                     guard let self, let driver = self.driver else { return }
+                    // The device first: whoever follows the published state (the desktop
+                    // widget reads the device) must find it changed already.
                     if self.isDriverMuted {
-                        self.isDriverMuted = false
                         Volume.setMuted(false, on: driver.id)
+                        self.isDriverMuted = false
                     }
+                    Volume.write(value, to: driver.id)
                     self.driverVolume = value.clamped01
                     self.applyParameters() // don't wait for the listener round trip
                     self.pushHardwareVolumes()
-                    Volume.write(value, to: driver.id)
                 }
             }
         )
@@ -391,6 +396,44 @@ final class Router: ObservableObject {
         return nil
     }
 
+    // MARK: - Desktop widget
+    //
+    // The outputs widget (Widget/) can't share storage with the app without an App Group:
+    // it reads this list from the app's preferences (a read-only sandbox exception) and asks
+    // for a toggle with a distributed notification, the output's UID as its object – a
+    // sandboxed sender can't attach anything else.
+
+    static let widgetOutputsKey = "widgetOutputs"
+    static let widgetToggleNotification = Notification.Name("dev.enke.AudIO.toggleOutput")
+    private var publishedToWidget: [[String: String]]?
+    private var widgetToggleObserver: NSObjectProtocol?
+
+    private func publishToWidget() {
+        let outputs = devices.map { device in
+            [
+                "uid": device.uid, "name": device.name, "symbol": device.symbolName,
+                "selected": routes[device.uid]?.isSelected == true ? "1" : "0",
+                "ready": isReady ? "1" : "0",
+            ]
+        }
+        guard outputs != publishedToWidget else { return }
+        publishedToWidget = outputs
+        UserDefaults.standard.set(outputs, forKey: Self.widgetOutputsKey)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
+    private func observeWidget() {
+        widgetToggleObserver = DistributedNotificationCenter.default().addObserver(
+            forName: Self.widgetToggleNotification, object: nil, queue: .main
+        ) { [weak self] notification in
+            guard let uid = notification.object as? String else { return }
+            MainActor.assumeIsolated {
+                guard let self, self.isReady, self.devices.contains(where: { $0.uid == uid }) else { return }
+                withAnimation(MenuMetrics.animation) { self.routes[uid, default: RouteSettings()].isSelected.toggle() }
+            }
+        }
+    }
+
     // MARK: - Taking over from macOS
 
     /// When outputs appeared – macOS makes a device the system output as it connects
@@ -441,6 +484,7 @@ final class Router: ObservableObject {
         syncDriverVolume()
         observeVolumes()
         refreshBluetooth()
+        publishToWidget()
         // Switching back right away – no need to stop routing in between.
         if takeOverFromNewDevice(wasActive: wasActive) { return }
         reconcile()

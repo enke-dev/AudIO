@@ -1,0 +1,1 @@
+["AppIntent", "EntityQuery", "AppEntity", "TransientEntity", "AppEnum", "AppShortcutsProvider", "DynamicOptionsProvider", "_IntentValueRepresentable", "_AssistantIntentsProvider", "_GenerativeFunctionExtractable", "IntentValueQuery", "Resolver", "WidgetConfigurationIntent", "ControlConfigurationIntent", "SetValueIntent", "AppIntentsPackage"]

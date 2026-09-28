@@ -40,6 +40,35 @@ compile_icon() {
     fi
 }
 
+# The widget extension, built like Xcode would: compiled with the App Intents' constant
+# values, linked with the extension entry point (`@main` alone crashed while bootstrapping),
+# plus the App Intents metadata – without it, its button's action isn't found.
+build_widget() {
+    local widget="$1" out=build/widget
+    rm -rf "$out" && mkdir -p "$out/meta" "$widget/Contents/MacOS" "$widget/Contents/Resources"
+    local target=arm64-apple-macos14.2
+    swiftc -O -wmo -c -target "$target" -parse-as-library -application-extension -module-name AudIOWidget \
+        -emit-const-values-path "$out/AudIOWidget.swiftconstvalues" \
+        -Xfrontend -const-gather-protocols-file -Xfrontend Widget/const-protocols.json \
+        Widget/*.swift -o "$out/AudIOWidget.o"
+    swiftc -target "$target" -application-extension -Xlinker -e -Xlinker _NSExtensionMain \
+        "$out/AudIOWidget.o" -o "$out/AudIOWidget"
+    for source in Widget/*.swift; do realpath "$source"; done > "$out/sources.txt"
+    realpath "$out/AudIOWidget.swiftconstvalues" > "$out/constvalues.txt"
+    xcrun appintentsmetadataprocessor --output "$out/meta" \
+        --toolchain-dir "$(dirname "$(dirname "$(dirname "$(xcrun --find swiftc)")")")" \
+        --module-name AudIOWidget --sdk-root "$(xcrun --show-sdk-path)" \
+        --xcode-version "$(xcodebuild -version | awk '/Build version/ { print $3 }')" \
+        --platform-family macOS --deployment-target 14.2 --target-triple "$target" \
+        --source-file-list "$out/sources.txt" --swift-const-vals-list "$out/constvalues.txt" \
+        --binary-file "$out/AudIOWidget" >/dev/null 2>&1
+    cp "$out/AudIOWidget" "$widget/Contents/MacOS/"
+    cp -R "$out/meta/Metadata.appintents" "$widget/Contents/Resources/"
+    xcrun xcstringstool compile Widget/Localizable.xcstrings --output-directory "$widget/Contents/Resources" >/dev/null
+    cp Widget/Info.plist "$widget/Contents/Info.plist"
+    codesign --force --sign "$identity" --timestamp=none --entitlements Widget/Widget.entitlements "$widget"
+}
+
 build() {
     # Apple Silicon only.
     swift build -c "$configuration" --arch arm64
@@ -60,6 +89,9 @@ build() {
     cp -R build/AudIO.driver "$app/Contents/Resources/"
     cp "$icon_dir"/Assets.car "$icon_dir"/Icon.icns "$app/Contents/Resources/" 2>/dev/null || true
 
+    # Desktop widget (WidgetKit extension, sandboxed), signed before the app around it.
+    build_widget "$app/Contents/PlugIns/AudIOWidget.appex"
+
     codesign --force --sign "$identity" --timestamp=none "$app"
     # The bundle is recreated at the same path – make Finder/LaunchServices drop the cached icon.
     touch "$app"
@@ -79,6 +111,10 @@ quit() {
 
 relaunch() {
     quit
+    # A running widget process keeps its old code, and the widget hosts their rendered
+    # snapshots – restarted, desktop widgets redraw with the new build (they flicker once).
+    pkill -x AudIOWidget 2>/dev/null || true
+    killall chronod NotificationCenter 2>/dev/null || true
     open "$1"
 }
 

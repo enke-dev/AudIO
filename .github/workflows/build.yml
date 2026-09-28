@@ -1,0 +1,23 @@
+name: Build
+
+# Branches other than main: build the app (widget included) on the release runner – no
+# version, no tag, no release. Checks the build before it reaches main.
+on:
+  push:
+    branches-ignore: [main]
+
+jobs:
+  build:
+    runs-on: xcode-27
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build app
+        run: scripts/app.sh build
+      - name: Check widget extension
+        run: |
+          widget=build/AudIO.app/Contents/PlugIns/AudIOWidget.appex
+          test -x "$widget/Contents/MacOS/AudIOWidget"
+          test -d "$widget/Contents/Resources/Metadata.appintents"
+          grep -q ToggleOutputIntent "$widget/Contents/Resources/Metadata.appintents/extract.actionsdata"
+          test -f "$widget/Contents/Resources/de.lproj/Localizable.strings"
+          codesign --verify --deep --strict build/AudIO.app && echo "signature ok"

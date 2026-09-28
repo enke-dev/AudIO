@@ -1,4 +1,5 @@
 import AppKit
+import WidgetKit
 import Combine
 import SwiftUI
 
@@ -12,6 +13,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusSubscription: AnyCancellable?
     private var clickMonitor: Any?
     private var wasInstalling = false
+    private var wasMuted: Bool?
+    private var widgetVolumeSubscription: AnyCancellable?
     private var terminationSignal: DispatchSourceSignal?
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -83,6 +86,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func subscribe(to router: Router) {
+        // The desktop widget shows the volume too – a drag changes it hundreds of times, and
+        // macOS rations widget reloads: along while it changes, at most one per 0.2 s (the
+        // last one included, so it ends on the final value). On the main queue – a run loop
+        // scheduler stalls while the panel's slider is dragged (event tracking mode).
+        widgetVolumeSubscription = router.$driverVolume.removeDuplicates()
+            .throttle(for: .seconds(0.2), scheduler: DispatchQueue.main, latest: true)
+            .sink { _ in WidgetCenter.shared.reloadAllTimelines() }
         statusSubscription = router.$status.combineLatest(router.$isInstallingDriver, router.$isDriverMuted)
             .sink { [weak self] status, isInstalling, isMuted in
                 guard let self else { return }
@@ -91,6 +101,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     else { "hifispeaker.2" }
                 // Muted shows on the icon, like the Sound menu's – no need to open the panel.
                 self.setIcon(symbol, slashed: isMuted && !isInstalling)
+                // The desktop widget reads the mute itself – only it doesn't notice changes.
+                if isMuted != self.wasMuted { WidgetCenter.shared.reloadAllTimelines() }
+                self.wasMuted = isMuted
                 // The password prompt closes the panel – show the result when done.
                 if self.wasInstalling, !isInstalling { self.showPanel() }
                 self.wasInstalling = isInstalling
