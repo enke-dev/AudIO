@@ -411,7 +411,8 @@ struct MasterVolumeView: View {
 
     var body: some View {
         HStack(spacing: MenuMetrics.sliderSpacing) {
-            Image(systemName: router.isDriverMuted ? "speaker.slash.fill" : "speaker.fill")
+            // Muted shows as the slider at 0 (and on the menu bar icon) – the symbols stay.
+            Image(systemName: "speaker.fill")
                 .frame(width: MenuMetrics.sliderIconWidth)
             MenuSlider(value: router.driverVolumeBinding())
             // The symbol's own space on its left: 7 pt to the slider, as in the Sound menu.

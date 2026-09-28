@@ -83,13 +83,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func subscribe(to router: Router) {
-        statusSubscription = router.$status.combineLatest(router.$isInstallingDriver)
-            .sink { [weak self] status, isInstalling in
+        statusSubscription = router.$status.combineLatest(router.$isInstallingDriver, router.$isDriverMuted)
+            .sink { [weak self] status, isInstalling, isMuted in
                 guard let self else { return }
                 let symbol = if isInstalling { "arrow.down.circle" }
                     else if case .routing = status { "hifispeaker.2.fill" }
                     else { "hifispeaker.2" }
-                self.setIcon(symbol)
+                // Muted shows on the icon, like the Sound menu's – no need to open the panel.
+                self.setIcon(symbol, slashed: isMuted && !isInstalling)
                 // The password prompt closes the panel – show the result when done.
                 if self.wasInstalling, !isInstalling { self.showPanel() }
                 self.wasInstalling = isInstalling
@@ -114,10 +115,123 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setIcon(_ symbol: String) {
-        let image = NSImage(systemSymbolName: symbol, accessibilityDescription: "AudIO")
-        image?.isTemplate = true
+    // MARK: - Icon
+
+    private var iconSymbol = "hifispeaker.2"
+    /// How much of the mute slash shows, 0…1 – animated like the Sound menu's.
+    private var slash: CGFloat = 0
+    /// Drawing on (from the top left) or off (towards the bottom right, like the Sound menu's).
+    private var isSlashDrawingOn = true
+    /// Through the switch, 0…1 – the speaker dips (fades, shrinks) meanwhile, like the Sound
+    /// menu's replaces its symbol.
+    private var switchProgress: CGFloat = 0
+    private var slashAnimation: Task<Void, Never>?
+
+    private func setIcon(_ symbol: String, slashed: Bool = false) {
+        iconSymbol = symbol
+        let target: CGFloat = slashed ? 1 : 0
+        let isFirst = statusItem?.button?.image == nil
+        guard target != slash, !isFirst, !NSWorkspace.shared.accessibilityDisplayShouldReduceMotion else {
+            slashAnimation?.cancel()
+            slash = target
+            switchProgress = 0
+            return renderIcon()
+        }
+        slashAnimation?.cancel()
+        let start = slash
+        isSlashDrawingOn = target > start
+        slashAnimation = Task { [weak self] in
+            // ~60 fps, timed by the clock – counting frames drifted late (each wait plus
+            // drawing takes longer than a frame), most of all the speaker coming back.
+            let begin = ContinuousClock.now
+            var t: CGFloat = 0
+            while t < 1 {
+                try? await Task.sleep(for: .milliseconds(16))
+                guard let self, !Task.isCancelled else { return }
+                let elapsed = ContinuousClock.now - begin
+                t = min(CGFloat(Double(elapsed.components.attoseconds) / 1e18 + Double(elapsed.components.seconds)) / Switch.duration, 1)
+                let timeline = self.isSlashDrawingOn ? Switch.muting : Switch.unmuting
+                self.slash = start + (target - start) * Self.phase(t, from: timeline.slash.lowerBound, to: timeline.slash.upperBound)
+                self.switchProgress = t >= 1 ? 0 : t
+                self.renderIcon()
+            }
+        }
+    }
+
+    /// Like the Sound menu's (measured frame by frame, unmuting): the speaker fades away
+    /// evenly, then the slash alone is drawn off, a short pause, the speaker comes back
+    /// quickly. Muting runs it backwards. In ms, as fractions of the switch.
+    private struct Switch {
+        let speakerGoes: ClosedRange<CGFloat>
+        let slash: ClosedRange<CGFloat>
+        let speakerComes: ClosedRange<CGFloat>
+
+        static let duration: CGFloat = 0.54
+        static let unmuting = Switch(speakerGoes: ms(0, 180), slash: ms(170, 400), speakerComes: ms(420, 540))
+        static let muting = unmuting.reversed
+
+        private static func ms(_ from: CGFloat, _ to: CGFloat) -> ClosedRange<CGFloat> {
+            (from / 1000 / duration)...(to / 1000 / duration)
+        }
+
+        private var reversed: Switch {
+            let flip = { (range: ClosedRange<CGFloat>) in (1 - range.upperBound)...(1 - range.lowerBound) }
+            return Switch(speakerGoes: flip(speakerComes), slash: flip(slash), speakerComes: flip(speakerGoes))
+        }
+    }
+
+    /// `t` mapped onto `from…to`, eased in and out – 0 before, 1 after.
+    private static func phase(_ t: CGFloat, from: CGFloat, to: CGFloat) -> CGFloat {
+        let local = min(max((t - from) / (to - from), 0), 1)
+        return local < 0.5 ? 2 * local * local : 1 - pow(-2 * local + 2, 2) / 2
+    }
+
+    /// How far the speaker is faded and shrunk: going (evenly), gone, coming back.
+    private static func dip(_ t: CGFloat, _ timeline: Switch) -> CGFloat {
+        guard t > 0 else { return 0 }
+        let linear = { (range: ClosedRange<CGFloat>) in min(max((t - range.lowerBound) / (range.upperBound - range.lowerBound), 0), 1) }
+        return linear(timeline.speakerGoes) - phase(t, from: timeline.speakerComes.lowerBound, to: timeline.speakerComes.upperBound)
+    }
+
+    private func renderIcon() {
+        guard let base = NSImage(systemSymbolName: iconSymbol, accessibilityDescription: "AudIO") else { return }
+        // The part of the slash's line that shows: grows from its start, or shrinks to its end.
+        let part = isSlashDrawingOn ? 0...slash : (1 - slash)...1
+        // Always drawn – the plain symbol sat a bit off from a drawn image (wiggle).
+        let timeline = isSlashDrawingOn ? Switch.muting : Switch.unmuting
+        let image = Self.icon(base, slash: slash > 0 ? part : nil, dip: Self.dip(switchProgress, timeline))
+        image.isTemplate = true
         statusItem?.button?.image = image
+    }
+
+    /// The symbol, optionally struck through like SF Symbols' ".slash" variants (none
+    /// exists for AudIO's): a diagonal line, cut free from the symbol by a gap – `slash` of
+    /// it. `dip` 0…1 fades and shrinks the symbol – away, as the Sound menu's vanishes
+    /// between its symbols. Aligned like the symbol itself.
+    private static func icon(_ symbol: NSImage, slash part: ClosedRange<CGFloat>?, dip: CGFloat) -> NSImage {
+        let image = NSImage(size: symbol.size, flipped: false) { rect in
+            guard let context = NSGraphicsContext.current?.cgContext else { return false }
+            let scale = 1 - 0.2 * dip
+            let scaled = rect.insetBy(dx: rect.width * (1 - scale) / 2, dy: rect.height * (1 - scale) / 2)
+            symbol.draw(in: scaled, from: .zero, operation: .sourceOver, fraction: 1 - dip)
+            guard let part else { return true }
+            let inset = rect.width * 0.08
+            let start = CGPoint(x: rect.minX + inset, y: rect.maxY - inset)
+            let end = CGPoint(x: rect.maxX - inset, y: rect.minY + inset)
+            let point = { (t: CGFloat) in CGPoint(x: start.x + (end.x - start.x) * t, y: start.y + (end.y - start.y) * t) }
+            let segment = [point(part.lowerBound), point(part.upperBound)]
+            context.setLineCap(.round)
+            context.setBlendMode(.clear)
+            context.setLineWidth(rect.width * 0.17)
+            context.strokeLineSegments(between: segment)
+            context.setBlendMode(.normal)
+            context.setStrokeColor(NSColor.black.cgColor)
+            context.setLineWidth(rect.width * 0.075)
+            context.strokeLineSegments(between: segment)
+            return true
+        }
+        image.alignmentRect = symbol.alignmentRect
+        return image
     }
 
     private func togglePanel() {

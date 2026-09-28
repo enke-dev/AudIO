@@ -265,14 +265,19 @@ final class Router: ObservableObject {
         )
     }
 
+    /// Muted reads 0, like the Sound menu's slider; moving it unmutes.
     func driverVolumeBinding() -> Binding<Double> {
         Binding(
             get: { [weak self] in
-                MainActor.assumeIsolated { self?.driverVolume ?? 1 }
+                MainActor.assumeIsolated { self.map { $0.isDriverMuted ? 0 : $0.driverVolume } ?? 1 }
             },
             set: { [weak self] value in
                 MainActor.assumeIsolated {
                     guard let self, let driver = self.driver else { return }
+                    if self.isDriverMuted {
+                        self.isDriverMuted = false
+                        Volume.setMuted(false, on: driver.id)
+                    }
                     self.driverVolume = value.clamped01
                     self.applyParameters() // don't wait for the listener round trip
                     self.pushHardwareVolumes()
