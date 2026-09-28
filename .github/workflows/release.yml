@@ -22,7 +22,7 @@ jobs:
     # macOS 27 SDK. Public preview – switch to `macos-27` once that label is available.
     runs-on: xcode-27
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history and tags for the version calculation
 
