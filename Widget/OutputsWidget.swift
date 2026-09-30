@@ -11,6 +11,9 @@ struct Output: Identifiable, Hashable {
     let name: String
     let symbol: String
     let isSelected: Bool
+    /// Percent and ms, as the panel shows them.
+    var level = 100
+    var delay = 0
 
     var id: String { uid }
 }
@@ -22,7 +25,10 @@ enum PublishedOutputs {
         else { return nil }
         let outputs = list.compactMap { item -> Output? in
             guard let uid = item["uid"], let name = item["name"] else { return nil }
-            return Output(uid: uid, name: name, symbol: item["symbol"] ?? "speaker.wave.2.fill", isSelected: item["selected"] == "1")
+            return Output(
+                uid: uid, name: name, symbol: item["symbol"] ?? "speaker.wave.2.fill", isSelected: item["selected"] == "1",
+                level: item["level"].flatMap(Int.init) ?? 100, delay: item["delay"].flatMap(Int.init) ?? 0
+            )
         }
         return (outputs, list.first?["ready"] == "1")
     }
@@ -68,7 +74,7 @@ struct OutputsProvider: TimelineProvider {
         OutputsEntry(
             mute: MuteEntry(isMuted: false, volume: 0.5),
             outputs: [
-                Output(uid: "a", name: String(localized: "Speaker"), symbol: "hifispeaker.fill", isSelected: true),
+                Output(uid: "a", name: String(localized: "Speaker"), symbol: "hifispeaker.fill", isSelected: true, level: 80, delay: 120),
                 Output(uid: "b", name: String(localized: "Headphones"), symbol: "headphones", isSelected: false),
             ],
             isReady: true, isAvailable: true
@@ -91,9 +97,13 @@ struct OutputsWidgetView: View {
     let entry: OutputsEntry
     @Environment(\.widgetFamily) private var family
 
-    /// Five fit the medium size (~128 pt): 5 × 24 + 4 × 2.
+    /// Five unticked ones fit the medium size (~128 pt): 5 × 24 + 4 × 2. Ticked ones are taller
+    /// (level and delay below the name).
     private static let rowHeight: CGFloat = 24
+    private static let tickedRowHeight: CGFloat = 32
     private static let rowSpacing: CGFloat = 2
+    /// How far the list fades out at the bottom when it doesn't fit.
+    private static let fade: CGFloat = 24
 
     var body: some View {
         Group {
@@ -114,31 +124,49 @@ struct OutputsWidgetView: View {
         .containerBackground(.fill.tertiary, for: .widget)
     }
 
+    /// All outputs – when they don't fit, faded out at the bottom (there's more).
     private var list: some View {
         GeometryReader { geometry in
+            let overflows = contentHeight > geometry.size.height
             VStack(alignment: .leading, spacing: Self.rowSpacing) {
                 if !entry.isAvailable {
                     Text("Open AudIO once").font(.caption).foregroundStyle(.secondary)
                 } else {
-                    let hint = entry.isReady ? 0 : 1
-                    // As many rows as fit – the hint takes one when AudIO isn't the output.
-                    let fitting = Int((geometry.size.height + Self.rowSpacing) / (Self.rowHeight + Self.rowSpacing)) - hint
-                    ForEach(entry.outputs.prefix(max(fitting, 0))) { output in
-                        Button(intent: ToggleOutputIntent(uid: output.uid)) { row(output) }
-                            .buttonStyle(.plain)
-                    }
+                    // First, so it never fades away.
                     if !entry.isReady {
                         Text("Select AudIO as sound output").font(.caption).foregroundStyle(.secondary)
                             .frame(height: Self.rowHeight)
                     }
+                    ForEach(entry.outputs) { output in
+                        Button(intent: ToggleOutputIntent(uid: output.uid)) { row(output) }
+                            .buttonStyle(.plain)
+                    }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
+            .clipped()
+            .mask {
+                LinearGradient(
+                    stops: [
+                        .init(color: .black, location: 0),
+                        .init(color: .black, location: overflows ? 1 - Self.fade / max(geometry.size.height, 1) : 1),
+                        .init(color: overflows ? .clear : .black, location: 1),
+                    ],
+                    startPoint: .top, endPoint: .bottom
+                )
+            }
         }
         .disabled(!entry.isReady)
     }
 
-    /// Like the panel's rows: a round symbol, accent-colored when ticked.
+    private var contentHeight: CGFloat {
+        let rows = entry.outputs.map { $0.isSelected ? Self.tickedRowHeight : Self.rowHeight } + (entry.isReady ? [] : [Self.rowHeight])
+        return rows.reduce(0, +) + CGFloat(max(rows.count - 1, 0)) * Self.rowSpacing
+    }
+
+    /// Like the panel's rows: a round symbol, accent-colored when ticked – then with level and
+    /// delay below the name, with the panel's symbols for them.
     private func row(_ output: Output) -> some View {
         HStack(spacing: 8) {
             Image(systemName: output.symbol)
@@ -146,10 +174,23 @@ struct OutputsWidgetView: View {
                 .foregroundStyle(output.isSelected ? Color.white : Color.primary)
                 .frame(width: 24, height: 24)
                 .background(Circle().fill(output.isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary)))
-            Text(verbatim: output.name).font(.callout).lineLimit(1)
+            VStack(alignment: .leading, spacing: 0) {
+                Text(verbatim: output.name).font(.callout).lineLimit(1)
+                if output.isSelected {
+                    HStack(spacing: 3) {
+                        Image(systemName: "speaker.wave.2")
+                        Text(verbatim: "\(output.level) %").padding(.trailing, 4)
+                        Image(systemName: "timer")
+                        Text(verbatim: "\(output.delay) ms")
+                    }
+                    .font(.caption2)
+                    .monospacedDigit()
+                    .foregroundStyle(.secondary)
+                }
+            }
             Spacer(minLength: 0)
         }
-        .frame(height: Self.rowHeight)
+        .frame(height: output.isSelected ? Self.tickedRowHeight : Self.rowHeight)
         .contentShape(Rectangle())
         .opacity(entry.isReady ? 1 : 0.5)
     }

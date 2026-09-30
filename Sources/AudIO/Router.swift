@@ -413,6 +413,8 @@ final class Router: ObservableObject {
             [
                 "uid": device.uid, "name": device.name, "symbol": device.symbolName,
                 "selected": routes[device.uid]?.isSelected == true ? "1" : "0",
+                "level": String(Int(((routes[device.uid]?.level ?? 1) * 100).rounded())),
+                "delay": String(Int((routes[device.uid]?.delayMs ?? 0).rounded())),
                 "ready": isReady ? "1" : "0",
             ]
         }
