@@ -22,6 +22,17 @@ Requires macOS 14.2 or later on Apple Silicon. Available in English, German, Fre
 - **Measure Delays** plays short test tones through each output and uses the microphone to align them. Keep the room quiet and the Mac near your listening position.
 - **Check for Updates** looks for a new release on GitHub at launch and once a day. **Update to …** next to the title installs it and restarts AudIO.
 
+## Widgets
+
+<p align="center"><img src="https://raw.githubusercontent.com/enke-dev/AudIO/main/docs/widgets.png" width="720" alt="AudIO's desktop widgets: small with mute and volume, medium and large with the outputs, level and delay"></p>
+
+Right-click the desktop › **Edit Widgets** and search for AudIO.
+
+- **AudIO** (small): click it to mute or unmute; the bar shows the volume.
+- **AudIO Outputs** (medium, large): the same, plus the outputs – click one to play on it or not. Selected outputs show their level and delay; a long list fades out at the bottom.
+
+Note: the widgets follow changes within a moment, except while AudIO's panel is open – macOS holds widget updates back while their app is in front, and they catch up when it closes. Like all third-party widgets, they sit on the system's dark widget background.
+
 ## Build
 
 Requires Xcode 26 or later; build with Xcode 27 for the macOS 27 menu bar behavior (icon highlight, auto-hidden menu bar stays revealed).
@@ -32,7 +43,9 @@ scripts/driver.sh install  # install the driver directly (restarts coreaudiod)
 scripts/release.sh         # build/AudIO-<version>.dmg
 ```
 
-Translations live in `Resources/Localizable.xcstrings` and `Resources/InfoPlist.xcstrings` (String Catalogs, editable in Xcode). To try a language: `open build/AudIO.app --args -AppleLanguages '(de)'`.
+The desktop widgets (`Widget/`) are a WidgetKit extension; `scripts/app.sh` builds it the way Xcode would (App Intents metadata, extension entry point) and restarts the widget services on install, so they show the new build.
+
+Translations live in `Resources/Localizable.xcstrings`, `Resources/InfoPlist.xcstrings` and `Widget/Localizable.xcstrings` (String Catalogs, editable in Xcode). To try a language: `open build/AudIO.app --args -AppleLanguages '(de)'`.
 
 Every push to `main` is released: GitHub Actions derives the next semver from [Conventional Commits](https://www.conventionalcommits.org) since the last tag (`feat` → minor, `!`/`BREAKING CHANGE` → major, anything else → patch; see `scripts/version.sh`), builds the `.dmg`, tags it and publishes the release. The version in `Resources/Info.plist` stays `0.0.0` in the repo. Builds are signed with a self-signed certificate so macOS keeps the audio permissions across updates: `scripts/signing.sh setup` creates it once, stores it in 1Password, sets the GitHub secrets and imports it into your keychain (`scripts/signing.sh import` on another Mac). Without it, builds are ad-hoc signed. After changing the driver, bump `CFBundleVersion` in `Driver/Info.plist` so the app offers the update.
 
