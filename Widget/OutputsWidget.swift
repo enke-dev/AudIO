@@ -96,6 +96,8 @@ struct OutputsProvider: TimelineProvider {
 struct OutputsWidgetView: View {
     let entry: OutputsEntry
     @Environment(\.widgetFamily) private var family
+    /// Not full color while the desktop isn't in front: everything in one tint.
+    @Environment(\.widgetRenderingMode) private var renderingMode
 
     /// Five unticked ones fit the medium size (~128 pt): 5 × 24 + 4 × 2. Ticked ones are taller
     /// (level and delay below the name).
@@ -160,6 +162,24 @@ struct OutputsWidgetView: View {
         .disabled(!entry.isReady)
     }
 
+    /// White on the accent when ticked – in one tint that's tint on tint, so then the symbol
+    /// is cut out of the circle instead.
+    @ViewBuilder
+    private func symbol(_ output: Output) -> some View {
+        let image = Image(systemName: output.symbol).font(.system(size: 11, weight: .semibold))
+        if output.isSelected, renderingMode != .fullColor {
+            Circle()
+                .overlay { image.blendMode(.destinationOut) }
+                .compositingGroup()
+                .frame(width: 24, height: 24)
+        } else {
+            image
+                .foregroundStyle(output.isSelected ? Color.white : Color.primary)
+                .frame(width: 24, height: 24)
+                .background(Circle().fill(output.isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary)))
+        }
+    }
+
     private var contentHeight: CGFloat {
         let rows = entry.outputs.map { $0.isSelected ? Self.tickedRowHeight : Self.rowHeight } + (entry.isReady ? [] : [Self.rowHeight])
         return rows.reduce(0, +) + CGFloat(max(rows.count - 1, 0)) * Self.rowSpacing
@@ -169,11 +189,7 @@ struct OutputsWidgetView: View {
     /// delay below the name, with the panel's symbols for them.
     private func row(_ output: Output) -> some View {
         HStack(spacing: 8) {
-            Image(systemName: output.symbol)
-                .font(.system(size: 11, weight: .semibold))
-                .foregroundStyle(output.isSelected ? Color.white : Color.primary)
-                .frame(width: 24, height: 24)
-                .background(Circle().fill(output.isSelected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.quaternary)))
+            symbol(output)
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: output.name).font(.callout).lineLimit(1)
                 if output.isSelected {
